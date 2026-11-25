@@ -1,0 +1,108 @@
+#### C01_const_horizon_realign
+import pandas as pd
+H = 5
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+df["fwd_ret"] = df["close"].shift(-H) / df["close"] - 1
+df["past_ret"] = df["fwd_ret"].shift(H)
+df["signal"] = (df["past_ret"] > 0).astype(int)
+df["strat"] = df["signal"] * df["fwd_ret"]
+#### C02_func_param_horizon_realign
+import pandas as pd
+def make(df, horizon):
+    df["fwd_ret"] = df["close"].shift(-horizon) / df["close"] - 1
+    df["mom"] = df["fwd_ret"].shift(horizon)
+    df["signal"] = (df["mom"] > 0).astype(int)
+    return df
+#### C03_pct_change_neg_realign
+import pandas as pd
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+df["fwd_ret"] = df["close"].pct_change(5).shift(-5)
+df["mom5"] = df["fwd_ret"].shift(5)
+df["position"] = (df["mom5"] > 0).astype(int)
+df["pnl"] = df["position"] * df["fwd_ret"]
+#### C04_np_roll_label_masked
+import numpy as np, pandas as pd
+c = pd.read_csv("px.csv")["close"].to_numpy()
+nxt = np.roll(c, -1)
+nxt[-1] = np.nan
+label = (nxt > c).astype(float)
+feat = np.column_stack([c / np.roll(c, 1) - 1])
+from sklearn.linear_model import LogisticRegression
+LogisticRegression().fit(feat[1:1000], label[1:1000])
+#### C05_scaler_on_train_mask_then_model
+import pandas as pd
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import Ridge
+df = pd.read_csv("feat.csv", parse_dates=["date"])
+train = df["date"] < "2018-01-01"
+X = df[["a", "b"]]
+y = df["close"].pct_change().shift(-1)
+sc = StandardScaler().fit(X[train])
+model = Ridge().fit(sc.transform(X[train]), y[train])
+pred = model.predict(sc.transform(X[~train]))
+#### C06_fwd_used_in_hit_rate_and_ic
+import pandas as pd, numpy as np
+df = pd.read_parquet("panel.parquet")
+df["fwd_ret"] = df.groupby("ticker")["close"].pct_change().shift(-1)
+df["score"] = df.groupby("ticker")["close"].pct_change(20)
+ic = df.groupby("date").apply(lambda g: g["score"].corr(g["fwd_ret"]))
+df["signal"] = df.groupby("date")["score"].rank(pct=True)
+long = df.loc[df["signal"] > 0.9]
+perf = long.groupby("date")["fwd_ret"].mean()
+print(ic.mean(), perf.mean())
+#### C07_entry_exit_fill_pnl
+import pandas as pd, numpy as np
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+df["signal"] = np.sign(df["close"] - df["close"].rolling(50).mean())
+entry_px = df["open"].shift(-1)
+exit_px = df["open"].shift(-2)
+trade_ret = exit_px / entry_px - 1
+df["pnl"] = df["signal"] * trade_ret - 0.0005 * df["signal"].diff().abs()
+#### C08_shift_neg_HORIZON_kw
+import pandas as pd
+HORIZON = 21
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+df["target"] = df["close"].shift(periods=-HORIZON) / df["close"] - 1
+df["ret_21"] = df["target"].shift(HORIZON)
+X = df[["ret_21"]].dropna()
+from sklearn.linear_model import Ridge
+Ridge().fit(X.iloc[:1000], df["target"].loc[X.index][:1000])
+#### C09_bucket_spread_on_past
+import pandas as pd
+df = pd.read_parquet("panel.parquet")
+df["fwd_ret"] = df.groupby("ticker")["close"].pct_change().shift(-1)
+df["decile"] = df.groupby("date")["mom"].transform(lambda s: pd.qcut(s, 10, labels=False))
+spread = df.groupby(["date", "decile"])["fwd_ret"].mean().unstack()
+ls = spread[9] - spread[0]
+print(ls.mean() / ls.std())
+#### C10_rolling_sharpe_lagged
+import pandas as pd, numpy as np
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+df["fwd_ret"] = df["close"].pct_change().shift(-1)
+df["signal"] = np.sign(df["close"] - df["close"].rolling(50).mean())
+edge = df["signal"] * df["fwd_ret"]
+weight = (edge.rolling(60).mean() / edge.rolling(60).std()).shift(1)
+df["strat"] = weight * df["signal"] * df["fwd_ret"]
+#### C11_lgb_with_label_and_valid
+import pandas as pd, lightgbm as lgb
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+df["mom"] = df["close"].pct_change(20)
+df["vol"] = df["close"].pct_change().rolling(20).std()
+lab = (df["close"].shift(-1) > df["close"]).astype(int)
+tr, va = slice(0, 2000), slice(2000, None)
+dtr = lgb.Dataset(df[["mom", "vol"]].iloc[tr], lab.iloc[tr])
+dva = lgb.Dataset(df[["mom", "vol"]].iloc[va], lab.iloc[va], reference=dtr)
+bst = lgb.train({"objective": "binary"}, dtr, valid_sets=[dva])
+#### C12_fwd_shift_neg_then_two_lags
+import pandas as pd
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+df["nxt_close"] = df["close"].shift(-2)
+df["prev"] = df["nxt_close"].shift(2)
+df["signal"] = df["prev"] > df["close"].shift(1)
+#### C13_dmatrix_label_neutral
+import pandas as pd, xgboost as xgb
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+r = df["close"].pct_change().shift(-1)
+feats = df[["close"]].pct_change()
+dtrain = xgb.DMatrix(feats.iloc[1:2000], label=r.iloc[1:2000])
+bst = xgb.train({}, dtrain)

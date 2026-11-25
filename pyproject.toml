@@ -1,0 +1,46 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "backtest-auditor"  # the import package stays nba_auditor
+version = "0.7.0"
+description = "Backtest Auditor: a red-team lint for trading strategies (static lookahead/bias lint, Deflated Sharpe, cost and stability audit), as a Python library and an MCP server."
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+license = "Apache-2.0"  # SPDX expression, full text in LICENSE
+license-files = ["LICENSE"]
+keywords = ["backtesting", "lookahead-bias", "mcp", "quant", "static-analysis", "deflated-sharpe-ratio"]
+classifiers = [
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Office/Business :: Financial :: Investment",
+    "Topic :: Software Development :: Quality Assurance",
+    "Intended Audience :: Developers",
+]
+dependencies = [
+    "mcp==2.3.0",
+    "numpy==2.5.4",
+    "pandas==3.0.6",
+    "scipy==1.18.1",
+]
+
+[project.urls]
+Homepage = "https://nothingbutalpha.app/backtest-audit"
+Repository = "https://github.com/nothingbutalpha/backtest-auditor"
+Issues = "https://github.com/nothingbutalpha/backtest-auditor/issues"
+
+[project.optional-dependencies]
+test = ["pytest==9.1.1"]
+
+[project.scripts]
+backtest-auditor = "nba_auditor.cli:server_or_cli"  # `uvx backtest-auditor` starts the MCP server
+nba-auditor = "nba_auditor.cli:main"
+nba-auditor-mcp = "nba_auditor.mcp:main"
+
+[tool.setuptools.packages.find]
+include = ["nba_auditor*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+norecursedirs = [".*", "build", "dist", "*.egg", "venv", ".venv", "corpus*"]  # corpus snippets are data, not tests

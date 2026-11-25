@@ -1,0 +1,37 @@
+#### H01_columns_list
+import pandas as pd
+from sklearn.ensemble import GradientBoostingRegressor
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+fwd = df["close"].shift(-5) / df["close"] - 1
+data = pd.DataFrame({"mom": df["close"].pct_change(20), "fwd": fwd}).dropna()
+data.columns = ["mom", "m2"]
+model = GradientBoostingRegressor().fit(data[["mom", "m2"]].iloc[:1000], fwd.loc[data.index].iloc[:1000])
+#### H02_rename_lambda
+import pandas as pd
+from sklearn.ensemble import GradientBoostingRegressor
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+fwd = df["close"].shift(-5) / df["close"] - 1
+data = pd.DataFrame({"mom": df["close"].pct_change(20), "fwd": fwd}).dropna()
+data = data.rename(columns=lambda c: c.replace("fwd", "m2"))
+model = GradientBoostingRegressor().fit(data[["mom", "m2"]].iloc[:1000], fwd.loc[data.index].iloc[:1000])
+#### H03_rename_columns_kw_reassign
+import pandas as pd
+from sklearn.ensemble import GradientBoostingRegressor
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+fwd = df["close"].shift(-5) / df["close"] - 1
+data = pd.DataFrame({"mom": df["close"].pct_change(20), "fwd": fwd}).dropna()
+data = data.rename(columns={"fwd": "m2"})
+model = GradientBoostingRegressor().fit(data[["mom", "m2"]].iloc[:1000], fwd.loc[data.index].iloc[:1000])
+#### H04_whole_frame_after_inplace
+import pandas as pd
+from sklearn.ensemble import GradientBoostingRegressor
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+fwd = df["close"].shift(-5) / df["close"] - 1
+data = pd.DataFrame({"mom": df["close"].pct_change(20), "fwd": fwd}).dropna()
+data.rename(columns={"fwd": "m2"}, inplace=True)
+model = GradientBoostingRegressor().fit(data.iloc[:1000], fwd.loc[data.index].iloc[:1000])
+#### H05_inline_sign_mul_pnl_named
+import pandas as pd, numpy as np
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+df["fwd_ret"] = df["close"].pct_change().shift(-1)
+df["pnl"] = np.sign(df["fwd_ret"].rolling(5).mean()) * df["fwd_ret"]

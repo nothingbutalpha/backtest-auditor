@@ -1,0 +1,84 @@
+#### P01_neutral_tilt_from_groupby
+import pandas as pd, numpy as np
+df = pd.read_parquet("panel.parquet")
+df["fwd_ret"] = df.groupby("ticker")["close"].pct_change().shift(-1)
+mkt = df.groupby("date")["fwd_ret"].mean()
+tilt = np.sign(mkt)
+bench = df.groupby("date")["ret"].mean()
+pnl = tilt * bench
+#### P02_booked_then_neutral_rolling
+import pandas as pd, numpy as np
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+df["fwd_ret"] = df["close"].pct_change().shift(-1)
+df["signal"] = np.sign(df["close"].diff(20))
+r = df["signal"] * df["fwd_ret"]
+k = r.rolling(20).mean().clip(0, None) * 10
+df["pnl"] = k * df["signal"] * df["fwd_ret"]
+#### P03_loc_mask_outcome_into_model
+import pandas as pd
+from sklearn.linear_model import Ridge
+df = pd.read_parquet("panel.parquet")
+df["fwd_ret"] = df.groupby("ticker")["close"].pct_change().shift(-5)
+liquid = df["volume"] > 1e6
+df["liq_fwd"] = df.loc[liquid, "fwd_ret"]
+X = df[["mom", "liq_fwd"]].fillna(0)
+model = Ridge().fit(X.iloc[:5000], df["fwd_ret"].fillna(0).iloc[:5000])
+#### P04_drop_by_position_iloc
+import pandas as pd
+from sklearn.ensemble import RandomForestRegressor
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+df["mom"] = df["close"].pct_change(20)
+df["fwd_ret"] = df["close"].shift(-5) / df["close"] - 1
+df["target"] = (df["fwd_ret"] > 0).astype(int)
+df = df.dropna()
+X = df.drop(columns=["target"])
+model = RandomForestRegressor().fit(X.iloc[:2000], df["target"].iloc[:2000])
+#### P05_drop_list_reassigned_after
+import pandas as pd
+from sklearn.ensemble import RandomForestRegressor
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+df["mom"] = df["close"].pct_change(20)
+df["fwd_ret"] = df["close"].shift(-5) / df["close"] - 1
+df["fwd_ret_10"] = df["close"].shift(-10) / df["close"] - 1
+leak_cols = [c for c in df.columns if c.startswith("fwd_ret")]
+X = df.drop(columns=leak_cols[:1]).dropna()
+model = RandomForestRegressor().fit(X.iloc[:2000], df["fwd_ret"].loc[X.index].iloc[:2000])
+#### P06_drop_inplace_wrong_frame
+import pandas as pd
+from sklearn.ensemble import RandomForestRegressor
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+df["mom"] = df["close"].pct_change(20)
+df["fwd_ret"] = df["close"].shift(-5) / df["close"] - 1
+feats = df.copy()
+df.drop(columns=["fwd_ret"], inplace=True)
+model = RandomForestRegressor().fit(feats.dropna().iloc[:2000], df["mom"].iloc[:2000])
+#### P07_drop_errors_ignore_typo
+import pandas as pd
+from sklearn.ensemble import RandomForestRegressor
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+df["mom"] = df["close"].pct_change(20)
+df["fwd_ret"] = df["close"].shift(-5) / df["close"] - 1
+X = df.drop(columns=["fwd_ret"]).join(df[["fwd_ret"]].rename(columns={"fwd_ret": "aux"})).dropna()
+model = RandomForestRegressor().fit(X.iloc[:2000], df["fwd_ret"].loc[X.index].iloc[:2000])
+#### P08_concat_feature_matrix_named_data
+import pandas as pd
+from sklearn.ensemble import RandomForestRegressor
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+mom = df["close"].pct_change(20)
+fwd = df["close"].shift(-5) / df["close"] - 1
+data = pd.concat([mom, fwd], axis=1).dropna()
+model = RandomForestRegressor().fit(data.iloc[:2000], fwd.loc[data.index].iloc[:2000])
+#### P09_dataframe_dict_feature_matrix_named_tbl
+import pandas as pd
+from sklearn.ensemble import RandomForestRegressor
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+fwd = df["close"].shift(-5) / df["close"] - 1
+tbl = pd.DataFrame({"mom": df["close"].pct_change(20), "fwd": fwd}).dropna()
+model = RandomForestRegressor().fit(tbl.iloc[:2000], tbl["fwd"].iloc[:2000])
+#### P10_dataframe_then_signal
+import pandas as pd, numpy as np
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+fwd = df["close"].shift(-5) / df["close"] - 1
+tbl = pd.DataFrame({"mom": df["close"].pct_change(20), "fwd": fwd})
+tbl["position"] = np.sign(tbl["fwd"])
+tbl["pnl"] = tbl["position"] * df["close"].pct_change()

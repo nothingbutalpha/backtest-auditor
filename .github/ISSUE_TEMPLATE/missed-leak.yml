@@ -1,0 +1,37 @@
+name: Missed leak
+description: The Auditor didn't flag code that uses information from the future.
+labels: ["missed-leak"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks. A short, self-contained snippet is the most useful report. Please remove anything private
+        (paths, data, credentials) before posting: this issue is public.
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Output of `pip show backtest-auditor` (the Version line), or the version your MCP client shows.
+      placeholder: "0.7.0"
+    validations:
+      required: true
+  - type: textarea
+    id: snippet
+    attributes:
+      label: Minimal code
+      description: The smallest Python snippet that still has the leak.
+      render: python
+    validations:
+      required: true
+  - type: textarea
+    id: leak
+    attributes:
+      label: Where is the leak?
+      description: Which line uses future information, and why.
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: What the Auditor reported
+      description: The findings you got (or "no findings"), from `nba-auditor check file.py` or the MCP tool.

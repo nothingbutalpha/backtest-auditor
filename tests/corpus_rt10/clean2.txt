@@ -1,0 +1,53 @@
+#### P01_open_above_prev_high
+import pandas as pd
+df = pd.read_csv("aapl.csv", index_col=0, parse_dates=True)
+entries = df["open"] > df["high"].shift(1)
+entry_px = df["open"].where(entries)
+exit_px = df["close"].where(entries)
+print((exit_px / entry_px - 1).mean())
+#### P02_loop_row_open_gap
+import pandas as pd
+df = pd.read_csv("aapl.csv")
+prev_close = None
+trades = []
+for _, row in df.iterrows():
+    if prev_close is not None and row["open"] < prev_close * 0.97:
+        trades.append(row["close"] / row["open"] - 1)
+    prev_close = row["close"]
+print(sum(trades))
+#### P03_prev_close_vs_prev_low_entry_open
+import pandas as pd
+df = pd.read_csv("aapl.csv", index_col=0, parse_dates=True)
+setup = (df["close"] < df["low"].rolling(10).min().shift(1)).shift(1, fill_value=False)
+entry_px = df["open"][setup]
+exit_px = df["close"].shift(-2)[setup]
+print((exit_px / entry_px - 1).mean())
+#### P04_np_arrays_prev_bar
+import numpy as np, pandas as pd
+d = pd.read_csv("aapl.csv")
+o, c = d["open"].to_numpy(), d["close"].to_numpy()
+sig = np.zeros(len(c), dtype=bool)
+sig[1:] = c[:-1] > o[:-1]
+r = np.where(sig, c / o - 1, 0.0)
+print(r.sum())
+#### P05_vbt_like_open_price_shifted_entries
+import pandas as pd
+df = pd.read_csv("aapl.csv", index_col=0, parse_dates=True)
+fast = df["close"].rolling(10).mean()
+slow = df["close"].rolling(50).mean()
+entries = (fast > slow).shift(1).fillna(False).astype(bool)
+buy_px = df["open"].where(entries & ~entries.shift(1, fill_value=False))
+print(buy_px.dropna().head())
+#### P06_overnight_hold_close_to_open
+import pandas as pd
+df = pd.read_csv("aapl.csv", index_col=0, parse_dates=True)
+sig = df["close"] > df["close"].rolling(20).mean()
+on_ret = df["open"].shift(-1) / df["close"] - 1
+pnl = on_ret[sig] - 0.0005
+#### P07_premarket_known_signal
+import pandas as pd
+df = pd.read_csv("aapl.csv", index_col=0, parse_dates=True)
+earn = df["earnings_before_open"].astype(bool)
+entry_px = df["open"].where(earn)
+exit_px = df["close"].where(earn)
+print((exit_px / entry_px - 1).mean())

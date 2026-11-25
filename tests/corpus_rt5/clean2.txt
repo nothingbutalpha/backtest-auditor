@@ -1,0 +1,64 @@
+#### D01_literal5
+import pandas as pd
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+df["fwd_ret"] = df["close"].shift(-5) / df["close"] - 1
+df["past_ret"] = df["fwd_ret"].shift(5)
+df["signal"] = (df["past_ret"] > 0).astype(int)
+#### D02_const_H
+import pandas as pd
+H = 5
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+df["fwd_ret"] = df["close"].shift(-H) / df["close"] - 1
+df["past_ret"] = df["fwd_ret"].shift(H)
+df["signal"] = (df["past_ret"] > 0).astype(int)
+#### D03_const_H_lag_bigger
+import pandas as pd
+H = 5
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+df["fwd_ret"] = df["close"].shift(-H) / df["close"] - 1
+df["past_ret"] = df["fwd_ret"].shift(H + 1)
+df["signal"] = (df["past_ret"] > 0).astype(int)
+#### D04_cfg_attr
+import pandas as pd
+class cfg: horizon = 5
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+df["fwd_ret"] = df["close"].shift(-cfg.horizon) / df["close"] - 1
+df["past_ret"] = df["fwd_ret"].shift(cfg.horizon)
+df["signal"] = (df["past_ret"] > 0).astype(int)
+#### D05_leaky_const_lag_smaller
+import pandas as pd
+H = 5
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+df["fwd_ret"] = df["close"].shift(-H) / df["close"] - 1
+df["past_ret"] = df["fwd_ret"].shift(1)
+df["signal"] = (df["past_ret"] > 0).astype(int)
+#### D06_leaky_lead_via_shift_neg_mul
+import pandas as pd
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+df["fwd_ret"] = df["close"].shift(-1 * 5) / df["close"] - 1
+df["past_ret"] = df["fwd_ret"].shift(1)
+df["signal"] = (df["past_ret"] > 0).astype(int)
+#### D07_leaky_rolling_lead_window
+import pandas as pd
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+df["fwd_max"] = df["close"].rolling(10).max().shift(-10)
+df["lag_max"] = df["fwd_max"].shift(1)
+df["signal"] = (df["close"] > df["lag_max"]).astype(int)
+#### D08_leaky_shift_neg5_then_pct_change
+import pandas as pd
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+df["f"] = df["close"].shift(-5)
+df["g"] = df["f"].pct_change(1)
+df["signal"] = (df["g"] > 0).astype(int)
+#### D09_leaky_lead_via_kw_and_lag_kw
+import pandas as pd
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+df["f"] = df["close"].shift(periods=-5)
+df["g"] = df["f"].shift(periods=1).rolling(5).mean()
+df["signal"] = (df["g"] > df["close"]).astype(int)
+#### D10_leaky_lag_via_diff
+import pandas as pd
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+df["f"] = df["close"].shift(-5)
+df["g"] = df["f"].diff(5)
+df["signal"] = (df["g"] > 0).astype(int)

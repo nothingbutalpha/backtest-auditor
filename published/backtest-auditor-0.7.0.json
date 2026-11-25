@@ -1,0 +1,31 @@
+{
+  "package": "backtest-auditor",
+  "version": "0.7.0",
+  "note": "The published PyPI files of this version (immutable). scripts/check_published.py fails while pyproject.toml says this version and nba_auditor/ differs from these files.",
+  "dists": {
+    "backtest_auditor-0.7.0-py3-none-any.whl": "79becd3d8fce3f5dc99cf5a6bb447491f956044879123ec8fb29657512855225",
+    "backtest_auditor-0.7.0.tar.gz": "d5c9ad4dd356653d5d91e206ad99a111f2af430abb109a42da4c310403b13d99"
+  },
+  "files": {
+    "__init__.py": "d37462a0c57d41037fdac64aed5db215c1447f49eae977d4d99be98dfa88583b",
+    "__main__.py": "935a1c1166b0c1ea35a82256345000bf2c73ded718d77773bc27a71ecce28f7d",
+    "backtest_audit.py": "6e75bf79e8968e6c77f4150355be038768bfcc12a286c7abe24b957947d9a157",
+    "catalog.py": "018b0a2489c68c6629fa94fe23bea712e3b3656d66bb95359f1dcd0a8dc2eee3",
+    "cli.py": "dbee95724d60352666f2fe80d294229c20da6961698bebbdb1970346b464e358",
+    "fixes.py": "c51e56477b765ffdbc55e88a49f7f190dbb3ce29bfb3bd9961ba0dd8cc087c35",
+    "lint.py": "a0d07c605c86b24466d3c8b135640af84f7e31d3048579be66a7002e8d1b1b04",
+    "mcp/__init__.py": "a7393e7898b50b99f6f211388096c930ab6218e97b5ed84c090c6267d667b732",
+    "mcp/__main__.py": "b9bb7a5f266f707c1d8c243dd01fd4e0c78ffb760976ecf9196502f723a092b8",
+    "parsing.py": "279315802893582ad28312ca5bae4910ac78b142b0be415367422f7c56445bc6",
+    "path_audit.py": "68810db92a526975675bd75dc259bcdbd9e69bfcca3f614363d00872cede6115",
+    "report.py": "2b2ee53c81a59ecd821da9909e16d1b106777326958b75deb8013acea2829352",
+    "returns_audit.py": "0fd0a04a1510226fc2ec0c533ec6ecca9ca3e3389ab986808e83d1a94c17ab91",
+    "safety.py": "86d8722c08bf3e3f1c4384cfe34d7549f80fd18c9e744067e01b186ce9281498",
+    "stats.py": "42e5dff4da8f80842c75ed1deb45b75fdf56869e894a9ab16e5addc45c2dbf45",
+    "templates/__init__.py": "40276dde209686d3cbb307bb81316f5a132c1f3febdf07e404925dfc5ca6cb76",
+    "templates/backtrader_template.py": "91b77d63d0027ee10288e8dfa53a39780fe57345605ea996856c9392f32a2f0b",
+    "templates/pandas_template.py": "9e9e6e8666803fc9939bf002dad9678e206dbf8bb48b895436645f42ce74e021",
+    "templates/vectorbt_template.py": "d87cc1fd2d7dd8a31e9137be4ced36081876cf49b63a79a4d16464df3974ef08",
+    "trade_log.py": "21744dd454c381549dc6ec01a155d3fed78bb0efe459643009b4503072c96476"
+  }
+}

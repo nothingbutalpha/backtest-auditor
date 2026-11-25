@@ -1,0 +1,30 @@
+#### J3_join_two_label_cols_list_keeps_one
+import pandas as pd
+from sklearn.ensemble import RandomForestRegressor
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+lab = pd.DataFrame({"target": df["close"].shift(-5) / df["close"] - 1,
+                    "ret_next": df["close"].shift(-1) / df["close"] - 1})
+df = df.join(lab)
+df["mom"] = df["close"].pct_change(20)
+X = df[["mom", "ret_next"]].dropna()
+RandomForestRegressor().fit(X.iloc[:1000], df.loc[X.index, "target"].iloc[:1000])
+#### J4_comprehension_excludes_only_target
+import pandas as pd
+from sklearn.ensemble import RandomForestRegressor
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+lab = (df["close"].shift(-5) / df["close"] - 1).rename("target")
+nxt = (df["close"].shift(-1) / df["close"] - 1).rename("r1")
+df = df.join(lab).join(nxt)
+cols = [c for c in df.columns if c != "target"]
+X = df[cols].dropna()
+RandomForestRegressor().fit(X.iloc[:1000], df.loc[X.index, "target"].iloc[:1000])
+#### J5_merge_labels_frame_list
+import pandas as pd
+from sklearn.ensemble import RandomForestRegressor
+px = pd.read_parquet("panel.parquet")
+labels = px[["date", "ticker"]].copy()
+labels["y"] = px.groupby("ticker")["close"].pct_change(5).shift(-5)
+labels["y_up"] = (labels["y"] > 0).astype(int)
+data = px.merge(labels, on=["date", "ticker"])
+X = data[["mom", "y_up"]].dropna()
+RandomForestRegressor().fit(X.iloc[:1000], data.loc[X.index, "y"].iloc[:1000])

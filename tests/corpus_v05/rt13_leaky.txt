@@ -1,0 +1,122 @@
+#### X01_idx_via_dict
+import numpy as np, pandas as pd
+bars = pd.read_parquet("spy.parquet")
+o, lo, c = bars["open"].to_numpy(), bars["low"].to_numpy(), bars["close"].to_numpy()
+sigs = {"long": np.flatnonzero(bars["close"].shift(-5).to_numpy() > c)}
+trades = []
+for i in sigs["long"]:
+    if i + 6 >= len(c):
+        break
+    limit = c[i] * 0.995
+    if lo[i + 1] <= limit:
+        trades.append(c[i + 6] / min(limit, o[i + 1]) - 1)
+print(np.mean(trades))
+#### X02_idx_via_class_attr
+import numpy as np, pandas as pd
+class Sig:
+    def __init__(self, bars):
+        c = bars["close"]
+        self.idx = np.flatnonzero((c.shift(-3) > c).to_numpy())
+bars = pd.read_parquet("spy.parquet")
+o, lo, c = bars["open"].to_numpy(), bars["low"].to_numpy(), bars["close"].to_numpy()
+s = Sig(bars)
+trades = []
+for i in s.idx:
+    if i + 6 >= len(c):
+        break
+    limit = c[i] * 0.995
+    if lo[i + 1] <= limit:
+        trades.append(c[i + 6] / min(limit, o[i + 1]) - 1)
+print(np.mean(trades))
+#### X03_idx_via_generator
+import numpy as np, pandas as pd
+bars = pd.read_parquet("spy.parquet")
+o, lo, c = bars["open"].to_numpy(), bars["low"].to_numpy(), bars["close"].to_numpy()
+def signal_days():
+    for k in range(len(c) - 5):
+        if c[k + 5] > c[k]:
+            yield k
+trades = []
+for i in signal_days():
+    if i + 6 >= len(c):
+        break
+    limit = c[i] * 0.995
+    if lo[i + 1] <= limit:
+        trades.append(c[i + 6] / min(limit, o[i + 1]) - 1)
+print(np.mean(trades))
+#### X04_idx_from_label_series_index
+import numpy as np, pandas as pd
+bars = pd.read_parquet("spy.parquet")
+o, lo, c = bars["open"].to_numpy(), bars["low"].to_numpy(), bars["close"].to_numpy()
+fwd = bars["close"].pct_change(5).shift(-5).reset_index(drop=True)
+idx = fwd[fwd > 0.01].index
+trades = []
+for i in idx:
+    if i + 6 >= len(c):
+        break
+    limit = c[i] * 0.995
+    if lo[i + 1] <= limit:
+        trades.append(c[i + 6] / min(limit, o[i + 1]) - 1)
+print(np.mean(trades))
+#### X05_fill_laundered_via_list_then_condition
+import numpy as np, pandas as pd
+d = pd.read_csv("spy.csv")
+o, lo, c = (d[k].to_numpy() for k in ("open", "low", "close"))
+sma = d["close"].rolling(20).mean().to_numpy()
+HOLD = 5
+trades = []
+for i in range(20, len(c) - HOLD - 1):
+    if c[i] < sma[i] and (not trades or trades[-1] > 0):
+        limit = c[i] * 0.99
+        if lo[i + 1] <= limit:
+            fill = min(limit, o[i + 1])
+            trades.append(c[i + 1 + HOLD] / fill - 1)
+print(np.mean(trades))
+#### X06_fill_laundered_dict_state
+import numpy as np, pandas as pd
+d = pd.read_csv("spy.csv")
+o, lo, c = (d[k].to_numpy() for k in ("open", "low", "close"))
+sma = d["close"].rolling(20).mean().to_numpy()
+HOLD = 5
+state = {"last": 0.0}
+log = []
+for i in range(20, len(c) - HOLD - 1):
+    if c[i] < sma[i] and state["last"] >= 0:
+        limit = c[i] * 0.99
+        if lo[i + 1] <= limit:
+            fill = min(limit, o[i + 1])
+            r = c[i + 1 + HOLD] / fill - 1
+            log.append(r)
+            state["last"] = r
+print(np.mean(log))
+#### X07_fill_list_sum_risk_stop
+import numpy as np, pandas as pd
+d = pd.read_csv("spy.csv")
+o, lo, c = (d[k].to_numpy() for k in ("open", "low", "close"))
+sma = d["close"].rolling(20).mean().to_numpy()
+HOLD = 5
+trades = []
+for i in range(20, len(c) - HOLD - 1):
+    if sum(trades) < -0.2:
+        break
+    if c[i] < sma[i]:
+        limit = c[i] * 0.99
+        if lo[i + 1] <= limit:
+            fill = min(limit, o[i + 1])
+            trades.append(c[i + 1 + HOLD] / fill - 1)
+print(np.mean(trades))
+#### X08_results_filtered_after_loop
+import numpy as np, pandas as pd
+d = pd.read_csv("spy.csv")
+o, lo, c = (d[k].to_numpy() for k in ("open", "low", "close"))
+sma = d["close"].rolling(20).mean().to_numpy()
+HOLD = 5
+trades = []
+for i in range(20, len(c) - HOLD - 1):
+    if c[i] < sma[i]:
+        limit = c[i] * 0.99
+        if lo[i + 1] <= limit:
+            fill = min(limit, o[i + 1])
+            trades.append(c[i + 1 + HOLD] / fill - 1)
+good = [t for t in trades if t > -0.02]
+print(np.mean(good))

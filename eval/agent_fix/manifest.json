@@ -1,0 +1,64 @@
+{
+  "about": "Planted leaks per file (rule id and the line range of the leaky statement). `also_allowed` lists lines a correct fix must also touch (an import). `no_safe_fix: true` marks a leak whose obvious mechanical fix would change what the code means (e.g. mirroring shift(-1) in `x.shift(-1) / x - 1`): those lines must not change. `protected` lists line ranges in correct code that the lint flags but that must not be changed (a centered window in a label, a fill across columns, a backward fill on newest-first data). `expect` gives the exact text a line must have if it is edited (anything else is a semantic change). Every line not covered by a fixable leak is a clean line: changing it counts against `clean_lines_changed`; changing a protected or no_safe_fix line also counts as a `semantic_change`. Both must be 0.",
+  "repos": {
+    "momentum_pandas": {
+      "features.py": {"leaks": [{"rule": "LA01", "lines": [5, 5], "no_safe_fix": true},
+                                {"rule": "LA02", "lines": [6, 6]},
+                                {"rule": "LA01", "lines": [8, 8]}],
+                      "note": "Line 5 is pct_change(-20): pct_change(20) has the opposite sign convention, so there's no mechanical fix. Line 8 is a bare signal lead, shift(-1) -> shift(1). The LA10 findings on lines 7-8 follow from line 5."},
+      "backtest.py": {"leaks": []}
+    },
+    "ml_classifier": {
+      "train_scaler.py": {"leaks": [{"rule": "LA05", "lines": [9, 9]}]},
+      "train_split.py": {"leaks": [{"rule": "LA06", "lines": [11, 11]}]},
+      "cv.py": {"leaks": [{"rule": "LA06", "lines": [11, 11], "also_allowed": [3]}]},
+      "train_clean.py": {"leaks": []}
+    },
+    "fundamentals": {
+      "value_signal.py": {"leaks": [{"rule": "LA03", "lines": [7, 7]}, {"rule": "LA03", "lines": [8, 8]},
+                                    {"rule": "LA03", "lines": [10, 10]}],
+                          "note": "Rows are visibly sorted ascending (sort_index), so backward fill reads the future."},
+      "value_clean.py": {"leaks": []}
+    },
+    "near_misses": {
+      "labels_and_lags.py": {"leaks": [], "note": "Negative shifts that build labels, a label times a signal, center=False."},
+      "walk_forward.py": {"leaks": [], "note": "shuffle=False, TimeSeriesSplit, scaler fitted on the training set."},
+      "fills.py": {"leaks": [], "note": "Forward fills only."}
+    },
+    "meaning_preservation": {
+      "centered_label.py": {"leaks": [], "protected": [[4, 4]],
+                            "note": "A centered window that builds a label is legitimate; making it trailing changes the label."},
+      "bfill_axis1.py": {"leaks": [], "protected": [[4, 4]],
+                         "note": "A fill across the columns of one bar is not a time leak; ffill(axis=1) changes the values."},
+      "newest_first_bfill.py": {"leaks": [], "protected": [[4, 4]],
+                                "note": "The file is newest-first until sort_index() on line 5: here bfill pulls past values and ffill would be the leak."},
+      "shift_ratio.py": {"leaks": [{"rule": "LA01", "lines": [4, 4], "no_safe_fix": true}],
+                         "note": "close.shift(-1) / close - 1 > 0 is the next-day return; shift(1) would make it the inverted previous-day return."},
+      "lagged_later.py": {"leaks": [], "protected": [[6, 6]],
+                          "note": "The lead is lagged again on line 7, so the position uses fast(t) vs slow(t-1); shifting line 6 would lag it twice."},
+      "lead_vs_close.py": {"leaks": [{"rule": "LA10", "lines": [4, 5], "no_safe_fix": true}],
+                           "note": "The lead on line 4 is compared with the unshifted close on line 5: mirroring it flips the signal's meaning."},
+      "panel_split.py": {"leaks": [{"rule": "LA06", "lines": [6, 6], "no_safe_fix": true}],
+                         "note": "z01 (PR #11 re-review): a panel sorted by [ticker, date]. shuffle=False would make the test set the last 20% of tickers, with every test date still in train."},
+      "panel_kfold.py": {"leaks": [{"rule": "LA06", "lines": [7, 7], "no_safe_fix": true}],
+                         "note": "y12: TimeSeriesSplit on a ticker-sorted panel splits ticker blocks, not time."},
+      "lead_lagged_later.py": {"leaks": [{"rule": "LA01", "lines": [4, 4], "expect": {"4": "df[\"vix_signal\"] = df[\"vix\"]"}}],
+                               "note": "z04: the result is lagged later (position.shift(1)), so the minimal fix drops the lead. Flipping it to shift(1) would lag twice: any other edit of line 4 counts as a semantic change."},
+      "neg_pct_change_diff.py": {"leaks": [{"rule": "LA01", "lines": [4, 4], "no_safe_fix": true},
+                                           {"rule": "LA01", "lines": [5, 5], "no_safe_fix": true}],
+                                 "note": "pct_change(-k) and diff(-k) mirrored have the opposite sign convention."}
+    },
+    "unfixable": {
+      "same_bar.py": {"leaks": [{"rule": "LA07", "lines": [7, 7]}], "note": "Same-bar signal and return: no automatic fix by design."},
+      "label_named_up.py": {"leaks": [{"rule": "LA05", "lines": [9, 9]}], "protected": [[7, 7]],
+                            "note": "Line 7 builds the model's label with shift(-1); the lint flags it LA01 because 'up' is not a label name. That line is correct and must not change. The real leak is fitting and predicting on the same rows (line 9)."},
+      "stratified_and_interp.py": {"leaks": [{"rule": "LA03", "lines": [5, 5]}, {"rule": "LA06", "lines": [9, 10]}],
+                                   "note": "interpolate() reads the next value (flagged 'possible' only); a stratified split needs shuffling, so neither has an automatic fix."}
+    },
+    "encodings": {
+      "bom_windows.py": {"leaks": [{"rule": "LA02", "lines": [4, 4]}], "note": "UTF-8 with a byte-order mark and CRLF line endings."},
+      "latin1_declared.py": {"leaks": [{"rule": "LA03", "lines": [6, 6]}], "note": "latin-1 with a PEP 263 coding line; sorted ascending."},
+      "momentum.ipynb": {"leaks": [{"rule": "LA01", "lines": [3, 3], "no_safe_fix": true}], "note": "Notebook, and pct_change(-10): no fix (notebooks get none yet, and the mirror flips the sign). Lines are in the joined code-cell source."}
+    }
+  }
+}

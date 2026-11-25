@@ -1,0 +1,2 @@
+# These files test byte-level input handling (UTF-8 BOM with CRLF, latin-1): never convert them.
+* -text

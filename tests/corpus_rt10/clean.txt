@@ -1,0 +1,123 @@
+#### N01_same_close_entry_next_close_exit
+import pandas as pd
+df = pd.read_csv("aapl.csv", index_col=0, parse_dates=True)
+sig = df["close"] > df["close"].rolling(50).mean()
+entry_px = df["close"].where(sig)
+exit_px = df["close"].shift(-1).where(sig)
+r = (exit_px / entry_px - 1 - 0.0005).dropna()
+print(r.mean())
+#### N02_open_to_close_prev_bar_signal
+import pandas as pd
+df = pd.read_csv("aapl.csv", index_col=0, parse_dates=True)
+sig = (df["close"] > df["close"].rolling(20).mean()).shift(1).fillna(False).astype(bool)
+entry_px = df["open"].where(sig)
+exit_px = df["close"].where(sig)
+day_ret = (exit_px / entry_px - 1 - 0.0005).dropna()
+#### N03_gap_open_signal_close_exit_np
+import numpy as np, pandas as pd
+df = pd.read_csv("aapl.csv", index_col=0, parse_dates=True)
+gap = df["open"] / df["close"].shift(1) - 1
+long = np.where(gap > 0.02, 1, 0)
+oc = df["close"] / df["open"] - 1
+pnl = long * oc - 0.0005 * long
+#### N04_prev_volume_spike_open_entry
+import pandas as pd
+df = pd.read_csv("aapl.csv", index_col=0, parse_dates=True)
+spike = df["volume"].shift(1) > 3 * df["volume"].rolling(20).mean().shift(2)
+fills = df.loc[spike, "open"]
+exits = df.loc[spike, "close"]
+print((exits / fills - 1).mean())
+#### N05_loop_prev_close_open_fill
+import pandas as pd
+df = pd.read_csv("aapl.csv")
+trades = []
+for i in range(1, len(df)):
+    if df["close"].iloc[i - 1] > df["open"].iloc[i - 1]:
+        trades.append(df["close"].iloc[i] / df["open"].iloc[i] - 1 - 0.0005)
+print(sum(trades))
+#### N06_opening_range_breakout_intraday
+import pandas as pd
+m = pd.read_parquet("spy_1min.parquet")
+m["day"] = m.index.date
+first = m.groupby("day").head(30)
+orh = first.groupby("day")["high"].max()
+m["orh"] = m["day"].map(orh)
+m["after"] = m.groupby("day").cumcount() >= 30
+m["sig"] = (m["close"] > m["orh"]) & m["after"]
+m["entry"] = m["open"].shift(-1).where(m["sig"])
+#### N07_limit_fill_only_select
+import pandas as pd
+df = pd.read_csv("spy.csv", index_col="date", parse_dates=True)
+want = df["close"] < df["close"].rolling(10).min().shift(1) * 1.01
+lim = df["close"] * 0.995
+hit = want & (df["low"].shift(-1) <= lim)
+r = (df["open"].shift(-3) / lim - 1)[hit] - 0.0005
+print(r.mean(), hit.mean())
+#### N08_labels_then_fit_target_col
+import pandas as pd
+from sklearn.ensemble import RandomForestClassifier
+def triple_barrier_labels(close, horizon=10):
+    labels = pd.Series(0, index=close.index, dtype=int)
+    for i in range(len(close) - horizon):
+        path = close.iloc[i + 1: i + 1 + horizon]
+        if path.max() > close.iloc[i] * 1.03:
+            labels.iloc[i] = 1
+    return labels
+px = pd.read_csv("spy.csv", index_col="date", parse_dates=True)
+px["target"] = triple_barrier_labels(px["close"])
+px["mom"] = px["close"].pct_change(20)
+X = px[["mom"]].iloc[20:-10]
+RandomForestClassifier().fit(X.iloc[:1000], px["target"].iloc[20:1020])
+#### N09_label_rate_by_year_plot
+import numpy as np, pandas as pd
+df = pd.read_csv("btc.csv", parse_dates=["date"])
+c = df["close"].to_numpy()
+labels = np.zeros(len(c))
+for i in range(len(c) - 20):
+    labels[i] = float(c[i + 1: i + 21].max() > c[i] * 1.05)
+df["label"] = labels
+df.groupby(df["date"].dt.year)["label"].mean().plot()
+#### N10_resample_daily_from_minutes_same_frame
+import pandas as pd
+m = pd.read_parquet("spy_1min.parquet")
+d = m["close"].resample("1D").last().to_frame("close")
+d["high"] = m["high"].resample("1D").max()
+d["ret"] = d["close"].pct_change()
+d["sig"] = (d["close"] > d["close"].rolling(20).mean()).shift(1)
+d["pnl"] = d["sig"] * d["ret"] - 0.0005
+#### N11_query_past_signal_eval
+import pandas as pd
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+df["mom"] = df["close"].pct_change(20)
+df["fwd_ret"] = df["close"].pct_change().shift(-1)
+strategy = df.query("mom > 0")
+print(strategy["fwd_ret"].mean() * 252)
+#### N12_copysign_lagged_signal_pnl
+import numpy as np, pandas as pd
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+df["ret"] = df["close"].pct_change()
+df["fwd_ret"] = df["ret"].shift(-1)
+df["pnl"] = np.copysign(df["fwd_ret"], df["ret"].rolling(20).mean()) - 0.0005
+#### N13_pivot_fwd_decile_eval
+import pandas as pd
+df = pd.read_parquet("panel.parquet")
+df["fwd_ret"] = df.groupby("ticker")["close"].pct_change().shift(-1)
+df["dec"] = df.groupby("date")["mom"].transform(lambda s: pd.qcut(s, 10, labels=False))
+tbl = df.pivot_table(index="date", columns="dec", values="fwd_ret", aggfunc="mean")
+ls = tbl[9] - tbl[0]
+print(ls.mean() / ls.std() * 252 ** 0.5)
+#### N14_apply_rank_cross_section
+import pandas as pd
+df = pd.read_parquet("panel.parquet")
+wide = df.pivot(index="date", columns="ticker", values="close")
+mom = wide.pct_change(20)
+z = mom.apply(lambda row: (row - row.mean()) / row.std(), axis=1)
+w = z.shift(1)
+pnl = (w * wide.pct_change()).sum(axis=1)
+#### N15_entry_at_close_signal_close_same_bar_moc
+import pandas as pd
+df = pd.read_csv("aapl.csv", index_col=0, parse_dates=True)
+sig = df["close"] < df["close"].rolling(5).min().shift(1)
+entry_px = df.loc[sig, "close"]
+exit_px = df["open"].shift(-1).loc[sig]
+print((exit_px / entry_px - 1).mean())

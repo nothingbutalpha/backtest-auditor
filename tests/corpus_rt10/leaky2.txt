@@ -1,0 +1,85 @@
+#### L1_label_column_then_lagged_signal
+import pandas as pd
+def triple_barrier_labels(close, horizon=10):
+    labels = pd.Series(0, index=close.index, dtype=int)
+    for i in range(len(close) - horizon):
+        path = close.iloc[i + 1: i + 1 + horizon]
+        if path.max() > close.iloc[i] * 1.03:
+            labels.iloc[i] = 1
+    return labels
+px = pd.read_csv("spy.csv", index_col="date", parse_dates=True)
+px["target"] = triple_barrier_labels(px["close"])
+px["signal"] = px["target"].shift(1)
+px["pnl"] = px["signal"] * px["close"].pct_change()
+#### L2_label_insert_expr
+import pandas as pd
+def make_labels(close, horizon=10):
+    labels = pd.Series(0, index=close.index, dtype=int)
+    for i in range(len(close) - horizon):
+        if close.iloc[i + horizon] > close.iloc[i]:
+            labels.iloc[i] = 1
+    return labels
+px = pd.read_csv("spy.csv", index_col="date", parse_dates=True)
+labels = make_labels(px["close"])
+px.insert(1, "lab", labels)
+px["position"] = px["lab"]
+px["pnl"] = px["position"] * px["close"].pct_change().shift(-1)
+#### L3_label_list_extend_into_positions
+import numpy as np, pandas as pd
+c = pd.read_csv("btc.csv")["close"].to_numpy()
+labels = []
+for i in range(len(c) - 5):
+    labels.append(1 if c[i + 5] > c[i] else -1)
+positions = []
+positions.extend(labels)
+pnl = np.array(positions[:-1]) * np.diff(c[:len(positions)]) / c[:len(positions) - 1]
+#### L4_target_used_as_feature_through_column
+import numpy as np, pandas as pd
+from sklearn.ensemble import RandomForestClassifier
+df = pd.read_csv("btc.csv")
+c = df["close"].to_numpy()
+target = np.zeros(len(c))
+for i in range(len(c) - 10):
+    if c[i + 1: i + 11].max() > c[i] * 1.05:
+        target[i] = 1
+df["target"] = target
+df["mom"] = df["close"].pct_change(10)
+X = df[["mom", "target"]].iloc[:-10]
+RandomForestClassifier().fit(X[:2000], df["target"].iloc[:2000])
+#### L5_label_values_via_where
+import pandas as pd
+def label_events(close, horizon=10):
+    labels = pd.Series(0, index=close.index, dtype=int)
+    for i in range(len(close) - horizon):
+        if close.iloc[i + horizon] > close.iloc[i] * 1.02:
+            labels.iloc[i] = 1
+    return labels
+px = pd.read_csv("spy.csv", index_col="date", parse_dates=True)
+y = label_events(px["close"])
+fwd = px["close"].pct_change().shift(-1)
+print(fwd.where(y == 1).mean() * 252)
+#### G6_fill_into_np_where_size
+import pandas as pd, numpy as np
+df = pd.read_csv("spy.csv", index_col="date", parse_dates=True)
+want_buy = df["close"] < df["close"].rolling(20).mean()
+limit_px = df["close"] * 0.99
+filled = want_buy & (df["low"].shift(-1) <= limit_px)
+size = np.where(df["low"].shift(-1) < limit_px * 0.98, 2.0, 1.0)
+trade_ret = (size * (df["close"].shift(-5) / limit_px - 1))[filled]
+print(trade_ret.mean())
+#### G7_fill_named_filled_but_entry_at_low
+import pandas as pd
+df = pd.read_csv("spy.csv", index_col="date", parse_dates=True)
+want_buy = df["close"] < df["close"].rolling(20).mean()
+limit_px = df["close"] * 0.99
+filled = want_buy & (df["low"].shift(-1) <= limit_px)
+entry = df["low"].shift(-1)
+trade_ret = (df["close"].shift(-5) / entry - 1)[filled]
+print(trade_ret.mean())
+#### G8_fill_cond_with_close_next
+import pandas as pd
+df = pd.read_csv("spy.csv", index_col="date", parse_dates=True)
+limit_px = df["close"] * 0.99
+filled = (df["low"].shift(-1) <= limit_px) & (df["close"].shift(-1) > limit_px)
+trade_ret = (df["close"].shift(-1) / limit_px - 1)[filled]
+print(trade_ret.mean())

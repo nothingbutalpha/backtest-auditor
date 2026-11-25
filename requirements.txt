@@ -1,0 +1,6 @@
+mcp==2.3.0
+numpy==2.5.4
+pandas==3.0.6
+scipy==1.18.1
+packaging==26.3  # scripts/check_published.py (PEP 440 version comparison)
+pytest==9.1.1

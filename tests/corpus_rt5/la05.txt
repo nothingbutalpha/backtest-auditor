@@ -1,0 +1,88 @@
+#### all
+import pandas as pd
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import Ridge
+df = pd.read_csv("feat.csv", parse_dates=["date"], index_col="date")
+X = df[["a", "b", "c"]]
+y = df["close"].pct_change().shift(-1)
+Xs = StandardScaler().fit_transform(X)
+X_train, X_test = Xs[:2000], Xs[2000:]
+model = Ridge().fit(X_train, y[:2000])
+print(model.score(X_test, y[2000:len(Xs)]))
+#### datemask_start
+import pandas as pd
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import Ridge
+df = pd.read_csv("feat.csv", parse_dates=["date"], index_col="date")
+X = df[["a", "b", "c"]]
+y = df["close"].pct_change().shift(-1)
+Xs = StandardScaler().fit_transform(X[X.index >= "2000-01-01"])
+X_train, X_test = Xs[:2000], Xs[2000:]
+model = Ridge().fit(X_train, y[:2000])
+print(model.score(X_test, y[2000:len(Xs)]))
+#### year_mask
+import pandas as pd
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import Ridge
+df = pd.read_csv("feat.csv", parse_dates=["date"], index_col="date")
+X = df[["a", "b", "c"]]
+y = df["close"].pct_change().shift(-1)
+Xs = StandardScaler().fit_transform(X[X.index.year >= 2000])
+X_train, X_test = Xs[:2000], Xs[2000:]
+model = Ridge().fit(X_train, y[:2000])
+print(model.score(X_test, y[2000:len(Xs)]))
+#### loc_to_last
+import pandas as pd
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import Ridge
+df = pd.read_csv("feat.csv", parse_dates=["date"], index_col="date")
+X = df[["a", "b", "c"]]
+y = df["close"].pct_change().shift(-1)
+Xs = StandardScaler().fit_transform(X.loc[:X.index[-1]])
+X_train, X_test = Xs[:2000], Xs[2000:]
+model = Ridge().fit(X_train, y[:2000])
+print(model.score(X_test, y[2000:len(Xs)]))
+#### iloc_len
+import pandas as pd
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import Ridge
+df = pd.read_csv("feat.csv", parse_dates=["date"], index_col="date")
+X = df[["a", "b", "c"]]
+y = df["close"].pct_change().shift(-1)
+Xs = StandardScaler().fit_transform(X.iloc[:len(X)])
+X_train, X_test = Xs[:2000], Xs[2000:]
+model = Ridge().fit(X_train, y[:2000])
+print(model.score(X_test, y[2000:len(Xs)]))
+#### test_window_mask
+import pandas as pd
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import Ridge
+df = pd.read_csv("feat.csv", parse_dates=["date"], index_col="date")
+X = df[["a", "b", "c"]]
+y = df["close"].pct_change().shift(-1)
+Xs = StandardScaler().fit_transform(X[X.index >= "2018-01-01"])
+X_train, X_test = Xs[:2000], Xs[2000:]
+model = Ridge().fit(X_train, y[:2000])
+print(model.score(X_test, y[2000:len(Xs)]))
+#### notna_mask
+import pandas as pd
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import Ridge
+df = pd.read_csv("feat.csv", parse_dates=["date"], index_col="date")
+X = df[["a", "b", "c"]]
+y = df["close"].pct_change().shift(-1)
+Xs = StandardScaler().fit_transform(X[y.notna()])
+X_train, X_test = Xs[:2000], Xs[2000:]
+model = Ridge().fit(X_train, y[:2000])
+print(model.score(X_test, y[2000:len(Xs)]))
+#### loc_start_str
+import pandas as pd
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import Ridge
+df = pd.read_csv("feat.csv", parse_dates=["date"], index_col="date")
+X = df[["a", "b", "c"]]
+y = df["close"].pct_change().shift(-1)
+Xs = StandardScaler().fit_transform(X.loc["2000":])
+X_train, X_test = Xs[:2000], Xs[2000:]
+model = Ridge().fit(X_train, y[:2000])
+print(model.score(X_test, y[2000:len(Xs)]))

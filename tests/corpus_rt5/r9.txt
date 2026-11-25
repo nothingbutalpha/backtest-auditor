@@ -1,0 +1,130 @@
+#### V01_sorted_cols_list
+import pandas as pd
+from sklearn.ensemble import GradientBoostingRegressor
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+fwd = df["close"].shift(-5) / df["close"] - 1
+data = pd.concat([df["close"].pct_change(20), df["close"].pct_change(5), fwd], axis=1, keys=["mom", "rev", "zfwd"]).dropna()
+data = data[sorted(data.columns)]
+X = data.iloc[:, :-1]
+model = GradientBoostingRegressor().fit(X.iloc[:1000], fwd.loc[X.index].iloc[:1000])
+#### V02_reindex_sorted_axis1
+import pandas as pd
+from sklearn.ensemble import GradientBoostingRegressor
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+fwd = df["close"].shift(-5) / df["close"] - 1
+data = pd.concat([df["close"].pct_change(20), df["close"].pct_change(5), fwd], axis=1, keys=["mom", "rev", "zfwd"]).dropna()
+data = data.reindex(sorted(data.columns), axis=1)
+X = data.iloc[:, :-1]
+model = GradientBoostingRegressor().fit(X.iloc[:1000], fwd.loc[X.index].iloc[:1000])
+#### V03_columns_reversed_select
+import pandas as pd
+from sklearn.ensemble import GradientBoostingRegressor
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+fwd = df["close"].shift(-5) / df["close"] - 1
+data = pd.concat([df["close"].pct_change(20), df["close"].pct_change(5), fwd], axis=1, keys=["mom", "rev", "zfwd"]).dropna()
+data = data[data.columns[::-1]]
+X = data.iloc[:, :-1]
+model = GradientBoostingRegressor().fit(X.iloc[:1000], fwd.loc[X.index].iloc[:1000])
+#### V04_filter_items
+import pandas as pd
+from sklearn.ensemble import GradientBoostingRegressor
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+fwd = df["close"].shift(-5) / df["close"] - 1
+data = pd.concat([df["close"].pct_change(20), df["close"].pct_change(5), fwd], axis=1, keys=["mom", "rev", "zfwd"]).dropna()
+data = data.filter(items=["zfwd", "mom", "rev"])
+X = data.iloc[:, :-1]
+model = GradientBoostingRegressor().fit(X.iloc[:1000], fwd.loc[X.index].iloc[:1000])
+#### V05_concat_rebuild
+import pandas as pd
+from sklearn.ensemble import GradientBoostingRegressor
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+fwd = df["close"].shift(-5) / df["close"] - 1
+data = pd.concat([df["close"].pct_change(20), df["close"].pct_change(5), fwd], axis=1, keys=["mom", "rev", "zfwd"]).dropna()
+data = pd.concat([data["zfwd"], data[["mom", "rev"]]], axis=1)
+X = data.iloc[:, :-1]
+model = GradientBoostingRegressor().fit(X.iloc[:1000], fwd.loc[X.index].iloc[:1000])
+#### V06_transpose_sort
+import pandas as pd
+from sklearn.ensemble import GradientBoostingRegressor
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+fwd = df["close"].shift(-5) / df["close"] - 1
+data = pd.concat([df["close"].pct_change(20), df["close"].pct_change(5), fwd], axis=1, keys=["mom", "rev", "zfwd"]).dropna()
+data = data.T.sort_index().T
+X = data.iloc[:, :-1]
+model = GradientBoostingRegressor().fit(X.iloc[:1000], fwd.loc[X.index].iloc[:1000])
+#### V07_values_then_slice
+import pandas as pd
+from sklearn.ensemble import GradientBoostingRegressor
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+fwd = df["close"].shift(-5) / df["close"] - 1
+data = pd.concat([df["close"].pct_change(20), df["close"].pct_change(5), fwd], axis=1, keys=["mom", "rev", "zfwd"]).dropna()
+arr = data[["zfwd", "mom", "rev"]].to_numpy()
+X = pd.DataFrame(arr[:, :-1])
+model = GradientBoostingRegressor().fit(X.iloc[:1000], fwd.loc[X.index].iloc[:1000])
+#### W01_neutral_mask
+import pandas as pd, numpy as np
+df = pd.read_parquet("panel.parquet")
+df["fwd_ret"] = df.groupby("ticker")["close"].pct_change().shift(-1)
+mkt = df.groupby("date")["fwd_ret"].mean()
+bench = df.groupby("date")["close"].mean().pct_change().shift(-1)
+ok = mkt > 0
+pnl = bench[ok].sum() - bench[~ok].sum()
+#### W02_regime_mask_loc
+import pandas as pd, numpy as np
+df = pd.read_parquet("panel.parquet")
+df["fwd_ret"] = df.groupby("ticker")["close"].pct_change().shift(-1)
+mkt = df.groupby("date")["fwd_ret"].mean()
+bench = df.groupby("date")["close"].mean().pct_change().shift(-1)
+regime = mkt.rolling(3).mean() > 0
+strat = bench.loc[regime]
+print(strat.mean() / strat.std() * 252 ** 0.5)
+#### W03_long_mask_values
+import pandas as pd, numpy as np
+df = pd.read_parquet("panel.parquet")
+df["fwd_ret"] = df.groupby("ticker")["close"].pct_change().shift(-1)
+mkt = df.groupby("date")["fwd_ret"].mean()
+bench = df.groupby("date")["close"].mean().pct_change().shift(-1)
+long = mkt > 0
+pnl = bench[long.values].sum()
+#### W04_long_index_select
+import pandas as pd, numpy as np
+df = pd.read_parquet("panel.parquet")
+df["fwd_ret"] = df.groupby("ticker")["close"].pct_change().shift(-1)
+mkt = df.groupby("date")["fwd_ret"].mean()
+bench = df.groupby("date")["close"].mean().pct_change().shift(-1)
+long = mkt > 0
+days = long[long].index
+pnl = bench.loc[days].sum()
+#### W05_where_mask
+import pandas as pd, numpy as np
+df = pd.read_parquet("panel.parquet")
+df["fwd_ret"] = df.groupby("ticker")["close"].pct_change().shift(-1)
+mkt = df.groupby("date")["fwd_ret"].mean()
+bench = df.groupby("date")["close"].mean().pct_change().shift(-1)
+in_mkt = mkt > 0
+strat = bench.where(in_mkt, 0.0)
+#### W06_query_on_frame
+import pandas as pd, numpy as np
+df = pd.read_parquet("panel.parquet")
+df["fwd_ret"] = df.groupby("ticker")["close"].pct_change().shift(-1)
+mkt = df.groupby("date")["fwd_ret"].mean()
+bench = df.groupby("date")["close"].mean().pct_change().shift(-1)
+frame = pd.DataFrame({"m": mkt, "b": bench})
+strat = frame.query("m > 0")["b"]
+print(strat.mean() * 252)
+#### X01_clean_capture_inline
+import pandas as pd, numpy as np
+df = pd.read_parquet("panel.parquet")
+df["fwd_ret"] = df.groupby("ticker")["close"].pct_change().shift(-1)
+mkt = df.groupby("date")["fwd_ret"].mean()
+bench = df.groupby("date")["close"].mean().pct_change().shift(-1)
+up_capture = bench[mkt > 0].mean() / mkt[mkt > 0].mean()
+print(up_capture)
+#### X02_clean_lagged_regime_mask
+import pandas as pd, numpy as np
+df = pd.read_parquet("panel.parquet")
+df["fwd_ret"] = df.groupby("ticker")["close"].pct_change().shift(-1)
+mkt = df.groupby("date")["fwd_ret"].mean()
+bench = df.groupby("date")["close"].mean().pct_change().shift(-1)
+regime = mkt.rolling(3).mean().shift(2) > 0
+strat = bench.loc[regime]

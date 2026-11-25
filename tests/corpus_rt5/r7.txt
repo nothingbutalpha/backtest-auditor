@@ -1,0 +1,135 @@
+#### E01_copysign
+import pandas as pd, numpy as np
+df = pd.read_parquet("panel.parquet")
+df["fwd_ret"] = df.groupby("ticker")["close"].pct_change().shift(-1)
+mkt = df.groupby("date")["fwd_ret"].mean()
+tilt = np.sign(mkt)
+bench = df.groupby("date")["close"].mean().pct_change().shift(-1)
+strat = np.copysign(bench, mkt)
+#### E02_masked_augassign
+import pandas as pd, numpy as np
+df = pd.read_parquet("panel.parquet")
+df["fwd_ret"] = df.groupby("ticker")["close"].pct_change().shift(-1)
+mkt = df.groupby("date")["fwd_ret"].mean()
+tilt = np.sign(mkt)
+bench = df.groupby("date")["close"].mean().pct_change().shift(-1)
+strat = bench.copy()
+strat[tilt < 0] *= -1
+#### E03_inline_sign_mul
+import pandas as pd, numpy as np
+df = pd.read_parquet("panel.parquet")
+df["fwd_ret"] = df.groupby("ticker")["close"].pct_change().shift(-1)
+mkt = df.groupby("date")["fwd_ret"].mean()
+tilt = np.sign(mkt)
+bench = df.groupby("date")["close"].mean().pct_change().shift(-1)
+strat = bench * np.sign(mkt)
+#### E04_eval_string
+import pandas as pd, numpy as np
+df = pd.read_parquet("panel.parquet")
+df["fwd_ret"] = df.groupby("ticker")["close"].pct_change().shift(-1)
+mkt = df.groupby("date")["fwd_ret"].mean()
+tilt = np.sign(mkt)
+bench = df.groupby("date")["close"].mean().pct_change().shift(-1)
+frame = pd.DataFrame({"t": tilt, "b": bench})
+strat = frame.eval("t * b")
+#### E05_where_kw_other
+import pandas as pd, numpy as np
+df = pd.read_parquet("panel.parquet")
+df["fwd_ret"] = df.groupby("ticker")["close"].pct_change().shift(-1)
+mkt = df.groupby("date")["fwd_ret"].mean()
+tilt = np.sign(mkt)
+bench = df.groupby("date")["close"].mean().pct_change().shift(-1)
+strat = bench.where(cond=tilt > 0, other=-bench)
+#### E06_mul_values
+import pandas as pd, numpy as np
+df = pd.read_parquet("panel.parquet")
+df["fwd_ret"] = df.groupby("ticker")["close"].pct_change().shift(-1)
+mkt = df.groupby("date")["fwd_ret"].mean()
+tilt = np.sign(mkt)
+bench = df.groupby("date")["close"].mean().pct_change().shift(-1)
+strat = bench.mul(tilt.values)
+#### E07_neg_mask_assign
+import pandas as pd, numpy as np
+df = pd.read_parquet("panel.parquet")
+df["fwd_ret"] = df.groupby("ticker")["close"].pct_change().shift(-1)
+mkt = df.groupby("date")["fwd_ret"].mean()
+tilt = np.sign(mkt)
+bench = df.groupby("date")["close"].mean().pct_change().shift(-1)
+strat = bench.copy()
+strat.loc[tilt < 0] = -bench
+#### F01_add_prefix
+import pandas as pd
+from sklearn.ensemble import GradientBoostingRegressor
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+fwd = df["close"].shift(-5) / df["close"] - 1
+data = pd.DataFrame({"mom": df["close"].pct_change(20), "fwd": fwd}).dropna()
+data = data.add_prefix("f_")
+X = data[["f_mom", "f_fwd"]]
+model = GradientBoostingRegressor().fit(X.iloc[:1000], fwd.loc[X.index].iloc[:1000])
+#### F02_set_axis
+import pandas as pd
+from sklearn.ensemble import GradientBoostingRegressor
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+fwd = df["close"].shift(-5) / df["close"] - 1
+data = pd.DataFrame({"mom": df["close"].pct_change(20), "fwd": fwd}).dropna()
+data = data.set_axis(["a", "b"], axis=1)
+X = data[["a", "b"]]
+model = GradientBoostingRegressor().fit(X.iloc[:1000], fwd.loc[X.index].iloc[:1000])
+#### F03_rename_mapper_axis
+import pandas as pd
+from sklearn.ensemble import GradientBoostingRegressor
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+fwd = df["close"].shift(-5) / df["close"] - 1
+data = pd.DataFrame({"mom": df["close"].pct_change(20), "fwd": fwd}).dropna()
+data = data.rename({"fwd": "m2"}, axis=1)
+X = data[["mom", "m2"]]
+model = GradientBoostingRegressor().fit(X.iloc[:1000], fwd.loc[X.index].iloc[:1000])
+#### F04_rename_inplace
+import pandas as pd
+from sklearn.ensemble import GradientBoostingRegressor
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+fwd = df["close"].shift(-5) / df["close"] - 1
+data = pd.DataFrame({"mom": df["close"].pct_change(20), "fwd": fwd}).dropna()
+data.rename(columns={"fwd": "m2"}, inplace=True)
+X = data[["mom", "m2"]]
+model = GradientBoostingRegressor().fit(X.iloc[:1000], fwd.loc[X.index].iloc[:1000])
+#### F05_rename_new_name
+import pandas as pd
+from sklearn.ensemble import GradientBoostingRegressor
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+fwd = df["close"].shift(-5) / df["close"] - 1
+data = pd.DataFrame({"mom": df["close"].pct_change(20), "fwd": fwd}).dropna()
+feat = data.rename(columns={"fwd": "m2"})
+model = GradientBoostingRegressor().fit(feat[["mom", "m2"]].iloc[:1000], fwd.loc[feat.index].iloc[:1000])
+#### F06_columns_str_replace
+import pandas as pd
+from sklearn.ensemble import GradientBoostingRegressor
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+fwd = df["close"].shift(-5) / df["close"] - 1
+data = pd.DataFrame({"mom": df["close"].pct_change(20), "fwd": fwd}).dropna()
+data.columns = data.columns.str.replace("fwd", "m2")
+model = GradientBoostingRegressor().fit(data[["mom", "m2"]].iloc[:1000], fwd.loc[data.index].iloc[:1000])
+#### G01_clean_rename_target_then_drop
+import pandas as pd
+from sklearn.ensemble import GradientBoostingRegressor
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+fwd = df["close"].shift(-5) / df["close"] - 1
+data = pd.DataFrame({"mom": df["close"].pct_change(20), "fwd": fwd}).dropna()
+data = data.rename(columns={"fwd": "target"})
+X = data.drop(columns=["target"])
+model = GradientBoostingRegressor().fit(X.iloc[:1000], data["target"].iloc[:1000])
+#### G02_clean_where_lagged
+import pandas as pd, numpy as np
+df = pd.read_parquet("panel.parquet")
+df["fwd_ret"] = df.groupby("ticker")["close"].pct_change().shift(-1)
+mkt = df.groupby("date")["fwd_ret"].mean()
+tilt = np.sign(mkt)
+bench = df.groupby("date")["close"].mean().pct_change().shift(-1)
+pos = tilt.shift(2)
+strat = bench.where(pos > 0, -bench)
+#### G03_clean_mul_lagged_signal
+import pandas as pd, numpy as np
+ret = pd.read_csv("r.csv", index_col=0).pct_change()
+sig = np.sign(ret.rolling(20).mean()).shift(1)
+strat = np.multiply(sig, ret).sum(axis=1)
+eq = np.dot(sig.fillna(0).iloc[-1], ret.fillna(0).iloc[-1])

@@ -1,0 +1,131 @@
+#### W1_loc_colon_col_write
+import pandas as pd
+def triple_barrier_labels(close, horizon=10):
+    labels = pd.Series(0, index=close.index, dtype=int)
+    for i in range(len(close) - horizon):
+        if close.iloc[i + 1: i + 1 + horizon].max() > close.iloc[i] * 1.03:
+            labels.iloc[i] = 1
+    return labels
+px = pd.read_csv("spy.csv", index_col="date", parse_dates=True)
+y = triple_barrier_labels(px["close"])
+px.loc[:, "lab"] = y
+px["position"] = px["lab"].shift(1)
+px["pnl"] = px["position"] * px["close"].pct_change()
+#### W2_setattr_write
+import pandas as pd
+def make_labels(close, horizon=10):
+    labels = pd.Series(0, index=close.index, dtype=int)
+    for i in range(len(close) - horizon):
+        if close.iloc[i + horizon] > close.iloc[i]:
+            labels.iloc[i] = 1
+    return labels
+px = pd.read_csv("spy.csv", index_col="date", parse_dates=True)
+y = make_labels(px["close"])
+setattr(px, "lab", y)
+px["position"] = px.lab.shift(1)
+px["pnl"] = px["position"] * px["close"].pct_change()
+#### W3_dict_update_frame
+import pandas as pd
+def make_labels(close, horizon=10):
+    labels = pd.Series(0, index=close.index, dtype=int)
+    for i in range(len(close) - horizon):
+        if close.iloc[i + horizon] > close.iloc[i]:
+            labels.iloc[i] = 1
+    return labels
+px = pd.read_csv("spy.csv", index_col="date", parse_dates=True)
+y = make_labels(px["close"])
+cols = {"close": px["close"]}
+cols.update({"lab": y})
+frame = pd.DataFrame(cols)
+frame["position"] = frame["lab"].shift(1)
+frame["pnl"] = frame["position"] * frame["close"].pct_change()
+#### W4_assign_kw
+import pandas as pd
+def make_labels(close, horizon=10):
+    labels = pd.Series(0, index=close.index, dtype=int)
+    for i in range(len(close) - horizon):
+        if close.iloc[i + horizon] > close.iloc[i]:
+            labels.iloc[i] = 1
+    return labels
+px = pd.read_csv("spy.csv", index_col="date", parse_dates=True)
+y = make_labels(px["close"])
+px = px.assign(regime=y.shift(1))
+px["pnl"] = px["regime"] * px["close"].pct_change()
+#### W5_tuple_unpack
+import pandas as pd
+def make_labels(close, horizon=10):
+    labels = pd.Series(0, index=close.index, dtype=int)
+    for i in range(len(close) - horizon):
+        if close.iloc[i + horizon] > close.iloc[i]:
+            labels.iloc[i] = 1
+    return labels
+px = pd.read_csv("spy.csv", index_col="date", parse_dates=True)
+y = make_labels(px["close"])
+y_train, sig = y, y.shift(1)
+px["pnl"] = sig * px["close"].pct_change()
+#### W6_list_comprehension_copy
+import numpy as np, pandas as pd
+c = pd.read_csv("btc.csv")["close"].to_numpy()
+labels = []
+for i in range(len(c) - 5):
+    labels.append(1 if c[i + 5] > c[i] else -1)
+pos = [x for x in labels]
+pnl = np.array(pos[:-1]) * np.diff(c[:len(pos)]) / c[:len(pos) - 1]
+#### W7_np_put
+import numpy as np, pandas as pd
+c = pd.read_csv("btc.csv")["close"].to_numpy()
+labels = np.zeros(len(c))
+for i in range(len(c) - 5):
+    labels[i] = 1 if c[i + 5] > c[i] else -1
+pos = np.zeros(len(c))
+np.copyto(pos, labels)
+pnl = pos[:-1] * np.diff(c) / c[:-1]
+#### G9_fill_low_next_into_exit_price
+import pandas as pd
+df = pd.read_csv("spy.csv", index_col="date", parse_dates=True)
+want_buy = df["close"] < df["close"].rolling(20).mean()
+limit_px = df["close"] * 0.99
+filled = want_buy & (df["low"].shift(-1) <= limit_px)
+best = df[["low", "high"]].shift(-1)
+trade_ret = (best["high"] / limit_px - 1)[filled]
+print(trade_ret.mean())
+#### G10_fill_mask_and_extra_filter_on_next_close
+import pandas as pd
+df = pd.read_csv("spy.csv", index_col="date", parse_dates=True)
+want_buy = df["close"] < df["close"].rolling(20).mean()
+limit_px = df["close"] * 0.99
+filled = want_buy & (df["low"].shift(-1) <= limit_px)
+keep = filled & (df["close"].shift(-1) > df["open"].shift(-1))
+trade_ret = (df["close"].shift(-5) / limit_px - 1)[keep]
+print(trade_ret.mean())
+#### G11_fill_mask_order_from_next_low
+import pandas as pd
+df = pd.read_csv("spy.csv", index_col="date", parse_dates=True)
+nl = df["low"].shift(-1)
+limit_px = nl * 1.001
+want_buy = df["close"] < df["close"].rolling(20).mean()
+filled = want_buy & (nl <= limit_px)
+trade_ret = (df["close"].shift(-5) / limit_px - 1)[filled]
+print(trade_ret.mean())
+#### G12_fill_mask_cumsum_count_signal
+import pandas as pd
+df = pd.read_csv("spy.csv", index_col="date", parse_dates=True)
+want_buy = df["close"] < df["close"].rolling(20).mean()
+limit_px = df["close"] * 0.99
+filled = want_buy & (df["low"].shift(-1) <= limit_px)
+streak = filled.cumsum()
+df["position"] = (streak.diff(5) > 1).astype(int)
+df["pnl"] = df["position"].shift(1) * df["close"].pct_change()
+#### G13_fill_mask_via_numpy
+import numpy as np, pandas as pd
+d = pd.read_csv("spy.csv")
+c, lo = d["close"].to_numpy(), d["low"].to_numpy()
+lim = c * 0.99
+want = c < pd.Series(c).rolling(20).mean().to_numpy()
+filled = np.zeros(len(c), dtype=bool)
+filled[:-1] = want[:-1] & (lo[1:] <= lim[:-1])
+size = np.zeros(len(c))
+size[:-1] = (lim[:-1] - lo[1:]) / lim[:-1]
+r = np.zeros(len(c))
+r[:-5] = c[5:] / lim[:-5] - 1
+print((size * r)[filled].mean())

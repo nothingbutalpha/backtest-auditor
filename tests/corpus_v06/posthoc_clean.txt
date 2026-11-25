@@ -1,0 +1,116 @@
+# Post-hoc precision probes for v0.6 (written after the fixes, so not part of the pre-registered twins): correct
+# code that looks like the new patterns. Every block must have no high/medium finding.
+
+#### live_ols_hedge
+import numpy as np, pandas as pd, statsmodels.api as sm
+px = pd.read_csv("pair.csv", index_col=0, parse_dates=True).iloc[-500:]
+a, b = np.log(px["A"]), np.log(px["B"])
+hedge = sm.OLS(a, sm.add_constant(b)).fit().params["B"]
+spread = a - hedge * b
+z = (spread.iloc[-1] - spread.mean()) / spread.std()
+signal = -np.sign(z) if abs(z) > 2 else 0
+print("today's signal", signal)
+
+#### find_peaks_drawdown_report
+import pandas as pd
+from scipy.signal import find_peaks
+equity = pd.read_csv("equity.csv", index_col=0)["equity"]
+peaks, _ = find_peaks(equity.to_numpy(), distance=20)
+print("number of local highs", len(peaks))
+
+#### gradient_plot
+import numpy as np, pandas as pd
+import matplotlib.pyplot as plt
+px = pd.read_csv("x.csv")["close"].to_numpy()
+slope = np.gradient(px)
+plt.plot(slope)
+plt.savefig("slope.png")
+
+#### dropna_axis1_corr
+import pandas as pd
+prices = pd.read_parquet("closes.parquet")
+rets = prices.pct_change().dropna(axis=1)
+print(rets.corr().round(2))
+
+#### groupby_ticker_rank_lagged_rolling
+import pandas as pd
+panel = pd.read_parquet("p.parquet").sort_values(["ticker", "date"])
+panel["mom"] = panel.groupby("ticker")["close"].pct_change(20).shift(1)
+panel["signal"] = panel.groupby("date")["mom"].rank(pct=True)
+print(panel["signal"].describe())
+
+#### daily_first_transform
+import pandas as pd
+m = pd.read_parquet("m.parquet")
+m["day_open"] = m.groupby(m.index.normalize())["open"].transform("first")
+m["signal"] = (m["close"] > m["day_open"]).astype(int)
+print((m["signal"].shift(1) * m["close"].pct_change()).sum())
+
+#### prev_day_stats_merged
+import pandas as pd
+m = pd.read_parquet("m.parquet")
+daily = m["close"].resample("1D").last().shift(1)
+m["prev_close"] = daily.reindex(m.index.normalize()).to_numpy()
+m["signal"] = (m["close"] > m["prev_close"]).astype(int)
+print((m["signal"].shift(1) * m["close"].pct_change()).sum())
+
+#### fill_at_open_entry
+import pandas as pd
+bars = pd.read_csv("b.csv")
+out = []
+for i in range(20, len(bars) - 5):
+    if bars["close"].iloc[i] < bars["close"].iloc[i - 20:i].mean():
+        entry_px = bars["open"].iloc[i + 1]
+        out.append(bars["close"].iloc[i + 5] / entry_px - 1)
+print(sum(out))
+
+#### stop_at_low
+import pandas as pd
+bars = pd.read_csv("b.csv")
+for i in range(1, len(bars)):
+    bar = bars.iloc[i]
+    stop_px = bar["low"] * 0.99
+    print(stop_px)
+
+#### pca_report_with_pnl_elsewhere
+import numpy as np, pandas as pd
+from sklearn.decomposition import PCA
+R = pd.read_parquet("r.parquet").fillna(0)
+pca = PCA(3).fit(R.to_numpy())
+print(pca.explained_variance_ratio_)
+w = R.rolling(20).mean().shift(1)
+pnl = (np.sign(w) * R).sum(axis=1)
+print(pnl.mean())
+
+#### kalman_filter_only
+import numpy as np, pandas as pd
+from pykalman import KalmanFilter
+y = pd.read_csv("y.csv")["y"].to_numpy()
+kf = KalmanFilter()
+state_means, _ = kf.filter(y)
+signal = np.sign(np.diff(state_means[:, 0], prepend=0))
+print(signal)
+
+#### test_metric_report_max
+from sklearn.metrics import f1_score
+import numpy as np
+best_thr = 0.5
+p_test = np.load("p.npy"); y_test = np.load("y.npy")
+print("worst-case F1", min(f1_score(y_test, p_test > t) for t in [0.4, 0.5, 0.6]))
+
+#### sample_frac_bootstrap
+import pandas as pd
+r = pd.read_csv("r.csv")["ret"]
+boot = [r.sample(frac=1, replace=True).mean() for _ in range(1000)]
+print(pd.Series(boot).quantile([0.05, 0.95]))
+
+#### tss_gap_label1
+import pandas as pd
+from sklearn.model_selection import TimeSeriesSplit
+from sklearn.linear_model import Ridge
+df = pd.read_parquet("f.parquet")
+df["y"] = df["close"].pct_change().shift(-1)
+df = df.dropna()
+X = df.drop(columns=["y", "close"])
+for tr, te in TimeSeriesSplit(5).split(X):
+    print(Ridge().fit(X.iloc[tr], df["y"].iloc[tr]).score(X.iloc[te], df["y"].iloc[te]))

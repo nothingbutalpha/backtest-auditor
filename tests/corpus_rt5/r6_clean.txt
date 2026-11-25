@@ -1,0 +1,111 @@
+#### K01_concat_iloc_last_col_label
+import pandas as pd
+from sklearn.ensemble import GradientBoostingRegressor
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+fwd = df["close"].shift(-5) / df["close"] - 1
+data = pd.concat([df["close"].pct_change(20), df["close"].pct_change(5), fwd], axis=1).dropna()
+X, y = data.iloc[:, :-1], data.iloc[:, -1]
+split = int(len(data) * 0.7)
+model = GradientBoostingRegressor().fit(X.iloc[:split], y.iloc[:split])
+print(model.score(X.iloc[split:], y.iloc[split:]))
+#### K02_values_split_columns
+import pandas as pd
+from sklearn.ensemble import GradientBoostingRegressor
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+fwd = df["close"].shift(-5) / df["close"] - 1
+arr = pd.concat([df["close"].pct_change(20), fwd], axis=1).dropna().to_numpy()
+X, y = arr[:, :-1], arr[:, -1]
+model = GradientBoostingRegressor().fit(X[:1000], y[:1000])
+#### K03_container_feature_cols_list
+import pandas as pd
+from sklearn.ensemble import GradientBoostingRegressor
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+fwd = df["close"].shift(-5) / df["close"] - 1
+data = pd.DataFrame({"mom": df["close"].pct_change(20), "vol": df["close"].pct_change().rolling(20).std(), "target": fwd}).dropna()
+FEATS = ["mom", "vol"]
+model = GradientBoostingRegressor().fit(data[FEATS].iloc[:1000], data["target"].iloc[:1000])
+pred = model.predict(data[FEATS].iloc[1000:])
+#### K04_container_drop_target_axis1
+import pandas as pd
+from sklearn.ensemble import GradientBoostingRegressor
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+fwd = df["close"].shift(-5) / df["close"] - 1
+data = pd.DataFrame({"mom": df["close"].pct_change(20), "target": fwd}).dropna()
+X = data.drop("target", axis=1)
+model = GradientBoostingRegressor().fit(X.iloc[:1000], data["target"].iloc[:1000])
+#### K05_long_short_spread_eval
+import pandas as pd
+df = pd.read_parquet("panel.parquet")
+df["fwd_ret"] = df.groupby("ticker")["close"].pct_change().shift(-1)
+df["q"] = df.groupby("date")["mom"].transform(lambda s: pd.qcut(s, 5, labels=False))
+long_leg = df[df["q"] == 4].groupby("date")["fwd_ret"].mean()
+short_leg = df[df["q"] == 0].groupby("date")["fwd_ret"].mean()
+long_short = long_leg - short_leg
+print(long_short.mean() / long_short.std() * 252 ** 0.5)
+#### K06_vol_target_lagged_pnl
+import pandas as pd, numpy as np
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+df["fwd_ret"] = df["close"].pct_change().shift(-1)
+df["signal"] = np.sign(df["close"].pct_change(20))
+gross = df["signal"] * df["fwd_ret"]
+lev = 0.1 / (gross.shift(1).rolling(20).std() * np.sqrt(252))
+net = lev * gross - 0.0005 * df["signal"].diff().abs()
+#### K07_weights_lagged_times_fwd
+import pandas as pd, numpy as np
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+df["ret"] = df["close"].pct_change()
+df["fwd_ret"] = df["ret"].shift(-1)
+vol = df["ret"].rolling(20).std()
+df["weight"] = 0.01 / vol
+df["pnl"] = df["weight"] * np.sign(df["ret"].rolling(10).sum()) * df["fwd_ret"]
+#### K08_ic_spread_long_short_eval
+import pandas as pd, numpy as np
+df = pd.read_parquet("panel.parquet")
+df["fwd_ret"] = df.groupby("ticker")["close"].pct_change().shift(-1)
+df["rank"] = df.groupby("date")["mom"].rank(pct=True)
+df["ls_weight"] = np.where(df["rank"] > 0.8, 1, np.where(df["rank"] < 0.2, -1, 0))
+df["contrib"] = df["ls_weight"] * df["fwd_ret"]
+daily = df.groupby("date")["contrib"].mean()
+hit = (daily > 0).mean()
+#### K09_hit_rate_compare_label
+import pandas as pd, numpy as np
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+up = df["close"].shift(-1) > df["close"]
+pred = df["close"].pct_change(5) > 0
+print((pred == up).mean())
+#### K10_regime_by_date_upper_mask
+import pandas as pd
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import Ridge
+df = pd.read_csv("feat.csv", parse_dates=["date"])
+is_train = (df["date"] >= "2005-01-01") & (df["date"] < "2018-01-01")
+X = df[["a", "b"]]
+y = df["close"].pct_change().shift(-1)
+sc = StandardScaler().fit(X[is_train])
+model = Ridge().fit(sc.transform(X[is_train]), y[is_train])
+print(model.score(sc.transform(X[~is_train & (df["date"] >= "2018-01-01")]), y[df["date"] >= "2018-01-01"]))
+#### K11_warmup_trim_then_split
+import pandas as pd
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import Ridge
+df = pd.read_csv("feat.csv", index_col=0, parse_dates=True)
+df = df.iloc[60:]
+X = df[["a", "b"]]
+y = df["close"].pct_change().shift(-1)
+X_train, X_test = X.iloc[:2000], X.iloc[2000:-1]
+sc = StandardScaler().fit(X_train)
+model = Ridge().fit(sc.transform(X_train), y.iloc[:2000])
+#### K12_symbolic_same_param
+import pandas as pd
+def build(df, horizon=5):
+    df["fwd_ret"] = df["close"].shift(-horizon) / df["close"] - 1
+    df["ret_h"] = df["close"] / df["close"].shift(horizon) - 1
+    df["prev_fwd"] = df["fwd_ret"].shift(horizon)
+    df["signal"] = (df["prev_fwd"] > 0) & (df["ret_h"] > 0)
+    return df
+#### K13_mul_method_lagged
+import pandas as pd, numpy as np
+df = pd.read_parquet("panel.parquet")
+ret = df.pivot(index="date", columns="ticker", values="ret")
+w = np.sign(ret.rolling(20).mean()).shift(1)
+pnl = ret.mul(w).sum(axis=1)

@@ -1,0 +1,180 @@
+#### A01_long_short_np_where_pnl
+import pandas as pd, numpy as np
+df = pd.read_parquet("panel.parquet")
+df["fwd_ret"] = df.groupby("ticker")["close"].pct_change().shift(-1)
+mkt = df.groupby("date")["fwd_ret"].mean()
+long_short = np.sign(mkt)
+bench = df.groupby("date")["close"].mean().pct_change().shift(-1)
+pnl = np.where(long_short > 0, bench, -bench)
+#### A02_ls_pos_mul_method
+import pandas as pd, numpy as np
+df = pd.read_parquet("panel.parquet")
+df["fwd_ret"] = df.groupby("ticker")["close"].pct_change().shift(-1)
+mkt = df.groupby("date")["fwd_ret"].mean()
+ls_pos = np.sign(mkt)
+bench = df.groupby("date")["close"].mean().pct_change().shift(-1)
+pnl = bench.mul(ls_pos)
+print(pnl.mean() / pnl.std() * 252 ** 0.5)
+#### A03_neutral_mul_method
+import pandas as pd, numpy as np
+df = pd.read_parquet("panel.parquet")
+df["fwd_ret"] = df.groupby("ticker")["close"].pct_change().shift(-1)
+mkt = df.groupby("date")["fwd_ret"].mean()
+tilt = np.sign(mkt)
+bench = df.groupby("date")["close"].mean().pct_change().shift(-1)
+strat = bench.mul(tilt)
+#### A04_long_short_weights_panel_mul
+import pandas as pd
+df = pd.read_parquet("panel.parquet")
+df["fwd_ret"] = df.groupby("ticker")["close"].pct_change().shift(-1)
+fr = df.pivot(index="date", columns="ticker", values="fwd_ret")
+long_short = fr.rank(axis=1, pct=True) - 0.5
+pnl = (long_short * fr).sum(axis=1)
+#### A05_long_short_weights_panel_mul_method
+import pandas as pd
+df = pd.read_parquet("panel.parquet")
+df["fwd_ret"] = df.groupby("ticker")["close"].pct_change().shift(-1)
+fr = df.pivot(index="date", columns="ticker", values="fwd_ret")
+long_short = fr.rank(axis=1, pct=True) - 0.5
+pnl = long_short.mul(fr).sum(axis=1)
+#### A06_ls_helper_backtest
+import pandas as pd, numpy as np
+def backtest(w, r):
+    return (w * r).sum(axis=1)
+df = pd.read_parquet("panel.parquet")
+df["fwd_ret"] = df.groupby("ticker")["close"].pct_change().shift(-1)
+fr = df.pivot(index="date", columns="ticker", values="fwd_ret")
+long_short = np.sign(fr.sub(fr.mean(axis=1), axis=0))
+pnl = backtest(long_short, fr)
+#### A07_long_short_dot
+import pandas as pd, numpy as np
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+df["fwd_ret"] = df["close"].pct_change().shift(-1)
+long_short = np.sign(df["fwd_ret"].rolling(5).mean())
+pnl = np.dot(long_short.fillna(0), df["fwd_ret"].fillna(0))
+#### B01_h_reassigned_module
+import pandas as pd
+h = 20
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+df["fwd"] = df["close"].shift(-h) / df["close"] - 1
+h = 1
+df["mom"] = df["fwd"].shift(h)
+df["signal"] = (df["mom"] > 0).astype(int)
+#### B02_h_reassigned_in_function
+import pandas as pd
+def run(df):
+    h = 20
+    df["fwd"] = df["close"].shift(-h) / df["close"] - 1
+    h = 1
+    df["mom"] = df["fwd"].shift(h)
+    df["signal"] = (df["mom"] > 0).astype(int)
+    return df
+#### B03_h_different_scopes
+import pandas as pd
+def add_label(df, h):
+    df["fwd"] = df["close"].shift(-h) / df["close"] - 1
+    return df
+def add_feat(df, h):
+    df["mom"] = df["fwd"].shift(h)
+    df["signal"] = (df["mom"] > 0).astype(int)
+    return df
+df = add_label(pd.read_csv("px.csv"), 20)
+df = add_feat(df, 1)
+#### B04_loop_var
+import pandas as pd
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+for h in (5, 20):
+    df["fwd"] = df["close"].shift(-h) / df["close"] - 1
+for h in (1,):
+    df["mom"] = df["fwd"].shift(h)
+df["signal"] = (df["mom"] > 0).astype(int)
+#### B05_param_default_shadow
+import pandas as pd
+H = 20
+def feats(df, H=1):
+    df["mom"] = df["fwd"].shift(H)
+    return df
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+df["fwd"] = df["close"].shift(-H) / df["close"] - 1
+df = feats(df)
+df["signal"] = (df["mom"] > 0).astype(int)
+#### C01_assign_target_fit
+import pandas as pd
+from sklearn.ensemble import GradientBoostingRegressor
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+feats = pd.DataFrame({"mom": df["close"].pct_change(20)})
+fwd = df["close"].shift(-5) / df["close"] - 1
+data = feats.assign(target=fwd).dropna()
+model = GradientBoostingRegressor().fit(data.iloc[:1000], data["target"].iloc[:1000])
+#### C02_join_fit
+import pandas as pd
+from sklearn.ensemble import GradientBoostingRegressor
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+feats = pd.DataFrame({"mom": df["close"].pct_change(20)})
+fwd = df["close"].shift(-5) / df["close"] - 1
+data = feats.join(fwd.rename("target")).dropna()
+model = GradientBoostingRegressor().fit(data.iloc[:1000], data["target"].iloc[:1000])
+#### C03_merge_fit
+import pandas as pd
+from sklearn.ensemble import GradientBoostingRegressor
+df = pd.read_parquet("panel.parquet")
+df["fwd_ret"] = df.groupby("ticker")["close"].pct_change().shift(-5)
+labels = df[["date", "ticker", "fwd_ret"]]
+feats = df[["date", "ticker", "mom"]]
+data = feats.merge(labels, on=["date", "ticker"]).dropna()
+model = GradientBoostingRegressor().fit(data[["mom", "fwd_ret"]].iloc[:1000], data["fwd_ret"].iloc[:1000])
+#### C04_dict_splat
+import pandas as pd
+from sklearn.ensemble import GradientBoostingRegressor
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+base = {"mom": df["close"].pct_change(20), "vol": df["close"].pct_change().rolling(20).std()}
+fwd = df["close"].shift(-5) / df["close"] - 1
+data = pd.DataFrame({**base, "y": fwd}).dropna()
+model = GradientBoostingRegressor().fit(data.iloc[:1000], data["y"].iloc[:1000])
+#### C05_dict_call
+import pandas as pd
+from sklearn.ensemble import GradientBoostingRegressor
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+fwd = df["close"].shift(-5) / df["close"] - 1
+data = pd.DataFrame(dict(mom=df["close"].pct_change(20), y=fwd)).dropna()
+model = GradientBoostingRegressor().fit(data.iloc[:1000], data["y"].iloc[:1000])
+#### C06_concat_axis0_rows
+import pandas as pd
+from sklearn.ensemble import GradientBoostingRegressor
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+fwd = df["close"].shift(-5) / df["close"] - 1
+mom = df["close"].pct_change(20)
+data = pd.concat([mom, fwd]).to_frame("x").dropna()
+model = GradientBoostingRegressor().fit(data.iloc[:1000], mom.iloc[:1000])
+#### C07_rename_then_select
+import pandas as pd
+from sklearn.ensemble import GradientBoostingRegressor
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+fwd = df["close"].shift(-5) / df["close"] - 1
+data = pd.DataFrame({"mom": df["close"].pct_change(20), "fwd": fwd}).dropna()
+data = data.rename(columns={"fwd": "mom2"})
+X = data[["mom", "mom2"]]
+model = GradientBoostingRegressor().fit(X.iloc[:1000], data["mom2"].iloc[:1000])
+#### C08_container_columns_list_then_iloc
+import pandas as pd
+from sklearn.ensemble import GradientBoostingRegressor
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+fwd = df["close"].shift(-5) / df["close"] - 1
+data = pd.concat([df["close"].pct_change(20), fwd], axis=1).dropna()
+data.columns = ["mom", "target"]
+X = data.iloc[:, [0, 1]]
+model = GradientBoostingRegressor().fit(X.iloc[:1000], data["target"].iloc[:1000])
+#### C09_container_to_signal_via_column
+import pandas as pd, numpy as np
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+fwd = df["close"].shift(-1) / df["close"] - 1
+tbl = pd.DataFrame({"mom": df["close"].pct_change(20), "nx": fwd})
+tbl["score"] = tbl["mom"] + tbl["nx"]
+tbl["position"] = np.sign(tbl["score"])
+#### C10_container_values_numpy
+import pandas as pd
+from sklearn.ensemble import GradientBoostingRegressor
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+fwd = df["close"].shift(-5) / df["close"] - 1
+arr = pd.concat([df["close"].pct_change(20), fwd], axis=1).dropna().values
+model = GradientBoostingRegressor().fit(arr[:1000], arr[:1000, 1])

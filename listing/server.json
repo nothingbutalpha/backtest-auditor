@@ -1,0 +1,27 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "app.nothingbutalpha/backtest-auditor",
+  "title": "Backtest Auditor",
+  "description": "Automated red-team checks for trading backtests: lookahead lint, Deflated Sharpe, costs. Local.",
+  "version": "0.7.0",
+  "websiteUrl": "https://nothingbutalpha.app/backtest-audit",
+  "icons": [
+    {
+      "src": "https://nothingbutalpha.app/logo-mark-512.png",
+      "mimeType": "image/png",
+      "sizes": ["512x512"]
+    }
+  ],
+  "packages": [
+    {
+      "registryType": "pypi",
+      "registryBaseUrl": "https://pypi.org",
+      "identifier": "backtest-auditor",
+      "version": "0.7.0",
+      "runtimeHint": "uvx",
+      "transport": {
+        "type": "stdio"
+      }
+    }
+  ]
+}

@@ -1,0 +1,116 @@
+#### M01_fit_all_before_split_base
+import pandas as pd
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import Ridge
+df = pd.read_csv("feat.csv", index_col=0, parse_dates=True)
+X = df[["a", "b", "c"]]
+y = df["close"].pct_change().shift(-1)
+Xs = StandardScaler().fit_transform(X)
+X_train, X_test = Xs[:2000], Xs[2000:]
+model = Ridge().fit(X_train, y[:2000])
+#### M02_fit_all_but_last_row_before_split
+import pandas as pd
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import Ridge
+df = pd.read_csv("feat.csv", index_col=0, parse_dates=True)
+X = df[["a", "b", "c"]]
+y = df["close"].pct_change().shift(-1)
+Xs = StandardScaler().fit_transform(X.iloc[:-1])
+X_train, X_test = Xs[:2000], Xs[2000:]
+model = Ridge().fit(X_train, y[:2000])
+#### M03_fit_from_start_date_before_split
+import pandas as pd
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import Ridge
+df = pd.read_csv("feat.csv", index_col=0, parse_dates=True)
+X = df[["a", "b", "c"]]
+y = df["close"].pct_change().shift(-1)
+Xs = StandardScaler().fit_transform(X.loc["2005-01-01":])
+X_train, X_test = Xs[:2000], Xs[2000:]
+model = Ridge().fit(X_train, y[:2000])
+#### M04_fit_datemask_all_after_start
+import pandas as pd
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import Ridge
+df = pd.read_csv("feat.csv", parse_dates=["date"])
+X = df[["a", "b", "c"]]
+y = df["close"].pct_change().shift(-1)
+Xs = StandardScaler().fit_transform(X[df["date"] >= "2005-01-01"])
+X_train, X_test = Xs[:2000], Xs[2000:]
+model = Ridge().fit(X_train, y[:2000])
+#### M05_pca_on_test_window
+import pandas as pd
+from sklearn.decomposition import PCA
+from sklearn.linear_model import Ridge
+df = pd.read_csv("feat.csv", index_col=0, parse_dates=True)
+X = df[["a", "b", "c", "d"]]
+y = df["close"].pct_change().shift(-1)
+pca = PCA(n_components=2).fit(X.iloc[1500:])
+Z = pca.transform(X)
+X_train, X_test = Z[:1500], Z[1500:]
+model = Ridge().fit(X_train, y[:1500])
+#### M06_model_fit_all_minus1_predict
+import pandas as pd
+from sklearn.ensemble import RandomForestClassifier
+df = pd.read_csv("feat.csv", index_col=0, parse_dates=True)
+X = df[["a", "b", "c"]]
+y = (df["close"].shift(-1) > df["close"]).astype(int)
+clf = RandomForestClassifier().fit(X.iloc[:-1], y.iloc[:-1])
+X_train, X_test = X.iloc[:2000], X.iloc[2000:-1]
+print(clf.score(X_test, y.iloc[2000:-1]))
+#### M07_model_fit_all_before_split
+import pandas as pd
+from sklearn.ensemble import RandomForestClassifier
+df = pd.read_csv("feat.csv", index_col=0, parse_dates=True)
+X = df[["a", "b", "c"]]
+y = (df["close"].shift(-1) > df["close"]).astype(int)
+clf = RandomForestClassifier().fit(X, y)
+X_train, X_test = X.iloc[:2000], X.iloc[2000:]
+print(clf.score(X_test, y.iloc[2000:]))
+#### M08_fit_dropna_start_slice
+import pandas as pd
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import Ridge
+df = pd.read_csv("feat.csv", index_col=0, parse_dates=True)
+X = df[["a", "b", "c"]]
+y = df["close"].pct_change().shift(-1)
+Xs = StandardScaler().fit_transform(X[20:])
+X_train, X_test = Xs[:2000], Xs[2000:]
+model = Ridge().fit(X_train, y[20:2020])
+#### N01_signal_from_outcome_via_np_sign_col
+import pandas as pd, numpy as np
+df = pd.read_parquet("panel.parquet")
+df["fwd_ret"] = df.groupby("ticker")["close"].pct_change().shift(-1)
+df["mkt_fwd"] = df.groupby("date")["fwd_ret"].transform("mean")
+df["position"] = np.sign(df["mkt_fwd"])
+df["pnl"] = df["position"] * df["ret"]
+#### N02_groupby_mean_then_reindex_weight
+import pandas as pd, numpy as np
+df = pd.read_parquet("panel.parquet")
+df["fwd_ret"] = df.groupby("ticker")["close"].pct_change().shift(-1)
+sect = df.groupby(["date", "sector"])["fwd_ret"].mean()
+weights = sect.groupby(level=0).rank(pct=True)
+pnl = (weights * sect).groupby(level=0).sum()
+#### N03_mean_fwd_per_ticker_as_weight
+import pandas as pd
+df = pd.read_parquet("panel.parquet")
+df["fwd_ret"] = df.groupby("ticker")["close"].pct_change().shift(-1)
+alpha = df.groupby("ticker")["fwd_ret"].mean()
+weights = alpha / alpha.abs().sum()
+port = df.pivot(index="date", columns="ticker", values="fwd_ret") @ weights
+#### N04_fill_return_feeds_size
+import pandas as pd, numpy as np
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+entry_px = df["open"].shift(-1)
+exit_px = df["open"].shift(-2)
+df["signal"] = np.sign(df["close"].pct_change(10))
+trade = df["signal"] * (exit_px / entry_px - 1)
+df["size"] = trade.rolling(50).mean() / trade.rolling(50).std()
+df["pnl"] = df["size"] * df["signal"] * (exit_px / entry_px - 1)
+#### N05_ic_weighting_cross_sectional
+import pandas as pd
+df = pd.read_parquet("panel.parquet")
+df["fwd_ret"] = df.groupby("ticker")["close"].pct_change().shift(-1)
+ic = df.groupby("date").apply(lambda g: g["mom"].corr(g["fwd_ret"]))
+w = ic.rolling(12).mean()
+df["signal"] = df["mom"] * df["date"].map(w)

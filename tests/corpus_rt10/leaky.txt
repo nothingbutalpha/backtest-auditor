@@ -1,0 +1,257 @@
+#### G1_fill_feeds_placement
+import pandas as pd
+df = pd.read_csv("spy.csv", index_col="date", parse_dates=True)
+limit_px = df["close"] * 0.99
+will_fill = df["low"].shift(-1) <= limit_px
+want_buy = will_fill & (df["close"] < df["close"].rolling(20).mean())
+exit_px = df["close"].shift(-5)
+trade_ret = (exit_px / limit_px - 1)[want_buy]
+print(trade_ret.mean())
+#### G2_fill_feeds_sizing
+import pandas as pd, numpy as np
+df = pd.read_csv("spy.csv", index_col="date", parse_dates=True)
+want_buy = df["close"] < df["close"].rolling(20).mean()
+limit_px = df["close"] * 0.99
+filled = want_buy & (df["low"].shift(-1) <= limit_px)
+depth = (limit_px - df["low"].shift(-1)) / limit_px
+size = np.clip(depth * 50, 0, 1)
+trade_ret = (size * (df["close"].shift(-5) / limit_px - 1))[filled]
+print(trade_ret.mean())
+#### G3_fill_feeds_later_signal
+import pandas as pd
+df = pd.read_csv("spy.csv", index_col="date", parse_dates=True)
+want_buy = df["close"] < df["close"].rolling(20).mean()
+limit_px = df["close"] * 0.99
+filled = want_buy & (df["low"].shift(-1) <= limit_px)
+df["signal"] = filled.rolling(5).sum() > 2
+df["strat"] = df["signal"].shift(1) * df["close"].pct_change()
+#### G4_fill_rate_as_feature
+import pandas as pd
+from sklearn.linear_model import LogisticRegression
+df = pd.read_csv("spy.csv", index_col="date", parse_dates=True)
+limit_px = df["close"] * 0.99
+filled = df["low"].shift(-1) <= limit_px
+df["fill_flag"] = filled.astype(int)
+X = df[["fill_flag"]].iloc[:-5]
+y = (df["close"].shift(-5) > df["close"]).astype(int).iloc[:-5]
+LogisticRegression().fit(X[:1000], y[:1000])
+#### G5_high_next_bar_take_profit_as_signal
+import pandas as pd
+df = pd.read_csv("spy.csv", index_col="date", parse_dates=True)
+tp = df["close"] * 1.01
+hit = df["high"].shift(-1) >= tp
+df["position"] = hit.astype(int)
+df["pnl"] = df["position"] * (df["close"].shift(-1) / df["close"] - 1)
+#### H1_summary_fed_back
+import numpy as np, pandas as pd
+df = pd.read_csv("btc.csv")
+c = df["close"].to_numpy()
+target = np.zeros(len(c))
+for i in range(len(c) - 21):
+    target[i] = 1.0 if c[i + 1: i + 21].max() >= c[i] * 1.05 else 0.0
+df["target"] = target
+rate = df.groupby(df["close"].pct_change(5).round(2))["target"].mean()
+df["score"] = df["close"].pct_change(5).round(2).map(rate)
+df["signal"] = df["score"] > 0.5
+df["pnl"] = df["signal"].shift(1) * df["close"].pct_change()
+#### H2_label_named_feature
+import numpy as np, pandas as pd
+from sklearn.ensemble import RandomForestClassifier
+df = pd.read_csv("btc.csv")
+c = df["close"].to_numpy()
+label_max = np.zeros(len(c))
+for i in range(len(c) - 21):
+    label_max[i] = c[i + 1: i + 21].max() / c[i] - 1
+df["label_max"] = label_max
+df["y"] = (df["close"].shift(-1) > df["close"]).astype(int)
+X = df[["label_max"]].iloc[:-21]
+RandomForestClassifier().fit(X[:2000], df["y"].iloc[:2000])
+#### H3_index_selects_returns
+import pandas as pd
+def triple_barrier_labels(close, horizon=10):
+    labels = pd.Series(0, index=close.index, dtype=int)
+    for i in range(len(close) - horizon):
+        path = close.iloc[i + 1: i + 1 + horizon]
+        if path.max() > close.iloc[i] * 1.03:
+            labels.iloc[i] = 1
+    return labels
+px = pd.read_csv("spy.csv", index_col="date", parse_dates=True)
+close = px["close"]
+y = triple_barrier_labels(close)
+trade_days = y[y == 1].index
+ret = close.pct_change().shift(-1)
+strat = ret.loc[trade_days]
+print(strat.mean() / strat.std() * 252 ** 0.5)
+#### H4_label_mean_to_threshold
+import numpy as np, pandas as pd
+c = pd.read_csv("btc.csv")["close"].to_numpy()
+target = []
+for i in range(len(c) - 21):
+    target.append(c[i + 21] / c[i] - 1)
+avg = np.mean(target)
+sig = np.where(np.array(target) > avg, 1, -1)
+r = np.diff(c[:len(sig) + 1]) / c[:len(sig)]
+pnl = sig * r
+#### H5_label_loop_values_into_signal
+import pandas as pd
+def make_labels(close, h=5):
+    out = pd.Series(0.0, index=close.index)
+    for i in range(len(close) - h):
+        out.iloc[i] = close.iloc[i + h] / close.iloc[i] - 1
+    return out
+px = pd.read_csv("spy.csv", index_col="date", parse_dates=True)
+lab = make_labels(px["close"])
+px["signal"] = lab.rolling(3).mean() > 0
+px["pnl"] = px["signal"].shift(1) * px["close"].pct_change()
+#### I1_same_bar_resample_then_join_fine
+import pandas as pd
+ticks = pd.read_parquet("es_ticks.parquet")
+bars = ticks["price"].resample("5min").ohlc()
+bars["vol"] = ticks["size"].resample("5min").sum()
+m1 = ticks["price"].resample("1min").last().to_frame("px")
+m1 = m1.join(bars["close"].rename("bar_close"), how="left").ffill()
+m1["signal"] = m1["px"] < m1["bar_close"]
+m1["pnl"] = m1["signal"].shift(1) * m1["px"].pct_change()
+#### I2_same_bar_resample_then_merge_asof
+import pandas as pd
+ticks = pd.read_parquet("es_ticks.parquet")
+bars = ticks["price"].resample("15min").ohlc()
+bars["hi"] = ticks["price"].resample("15min").max()
+m1 = ticks["price"].resample("1min").last().to_frame("px").reset_index()
+bars = bars.reset_index()
+m = pd.merge_asof(m1, bars[["index", "hi"]], left_on="index", right_on="index")
+m["signal"] = m["px"] >= m["hi"]
+#### F1_param_default_lookahead
+import numpy as np, pandas as pd
+def run(c, k=1):
+    pos = np.zeros(len(c))
+    for i in range(len(c) - k):
+        if c[i + k] > c[i]:
+            pos[i] = 1
+    return pos
+c = pd.read_csv("px.csv")["close"].to_numpy()
+pos = run(c)
+pnl = pos[:-1] * np.diff(c) / c[:-1]
+#### F2_missing_check_then_value
+import numpy as np, pandas as pd
+c = pd.read_csv("px.csv")["close"].to_numpy()
+pos = np.zeros(len(c))
+for i in range(len(c) - 1):
+    if not np.isnan(c[i + 1]) and c[i + 1] > c[i]:
+        pos[i] = 1
+pnl = pos[:-1] * np.diff(c) / c[:-1]
+#### F3_isnan_guard_trades
+import numpy as np, pandas as pd
+px = pd.read_parquet("closes.parquet").to_numpy()
+pos = np.zeros(px.shape)
+for i in range(len(px) - 1):
+    for j in range(px.shape[1]):
+        if np.isnan(px[i + 1, j]):
+            continue
+        if px[i + 1, j] > px[i, j]:
+            pos[i, j] = 1
+#### F4_string_loop_name_but_prices
+import numpy as np, pandas as pd
+closes = pd.read_csv("px.csv")["close"].tolist()
+sig = []
+for i, ch in enumerate(closes[:-1]):
+    sig.append(1 if closes[i + 1] > ch else -1)
+ret = np.diff(closes) / np.array(closes[:-1])
+pnl = np.array(sig) * ret
+#### J1_column_list_excludes_label_but_feature_from_label
+import pandas as pd
+from sklearn.ensemble import RandomForestRegressor
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+labels = (df["close"].shift(-5) / df["close"] - 1).rename("target")
+df = df.join(labels)
+df["mom"] = df["close"].pct_change(20)
+df["tgt_smooth"] = df["target"].rolling(3).mean()
+X = df[["mom", "tgt_smooth"]].dropna()
+RandomForestRegressor().fit(X.iloc[:1000], df.loc[X.index, "target"].iloc[:1000])
+#### J2_join_label_list_includes_renamed
+import pandas as pd
+from sklearn.ensemble import RandomForestRegressor
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+fwd = df["close"].shift(-5) / df["close"] - 1
+df = df.join(fwd.rename("aux5"))
+df["mom"] = df["close"].pct_change(20)
+FEATS = ["mom", "aux5"]
+X = df[FEATS].dropna()
+RandomForestRegressor().fit(X.iloc[:1000], fwd.loc[X.index].iloc[:1000])
+#### K1_bucket_pivot_as_feature
+import pandas as pd
+df = pd.read_parquet("panel.parquet")
+df["fwd_ret"] = df.groupby("ticker")["close"].pct_change().shift(-1)
+df["dec"] = df.groupby("date")["mom"].transform(lambda s: pd.qcut(s, 10, labels=False))
+tbl = df.pivot_table(index="date", columns="dec", values="fwd_ret", aggfunc="mean")
+df["dec_ret"] = df.set_index(["date", "dec"]).index.map(tbl.stack())
+df["signal"] = df.groupby("date")["dec_ret"].rank(pct=True)
+#### K2_bucket_pivot_best_bucket_choice
+import pandas as pd
+df = pd.read_parquet("panel.parquet")
+df["fwd_ret"] = df.groupby("ticker")["close"].pct_change().shift(-1)
+df["dec"] = df.groupby("date")["mom"].transform(lambda s: pd.qcut(s, 10, labels=False))
+tbl = df.pivot_table(index="date", columns="dec", values="fwd_ret", aggfunc="mean")
+best = tbl.idxmax(axis=1)
+df["position"] = (df["dec"] == df["date"].map(best)).astype(int)
+df["pnl"] = df["position"] * df["fwd_ret"]
+#### K3_unstack_fwd_rank_weights
+import pandas as pd
+df = pd.read_parquet("panel.parquet")
+df["fwd_ret"] = df.groupby("ticker")["close"].pct_change().shift(-1)
+fr = df.set_index(["date", "ticker"])["fwd_ret"].unstack()
+w = fr.rank(axis=1, pct=True) - 0.5
+pnl = (w * fr).sum(axis=1)
+#### Q1_query_strategy_name
+import pandas as pd
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+df["fwd_ret"] = df["close"].pct_change().shift(-1)
+strategy = df.query("fwd_ret > 0")
+print(strategy["fwd_ret"].mean() * 252)
+#### Q2_query_neutral_then_signal
+import pandas as pd
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+df["fwd_ret"] = df["close"].pct_change().shift(-1)
+good = df.query("fwd_ret > 0").index
+df["position"] = df.index.isin(good).astype(int)
+df["pnl"] = df["position"] * df["fwd_ret"]
+#### Q3_eval_assign_feature
+import pandas as pd
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+df["fwd_ret"] = df["close"].pct_change().shift(-1)
+df = df.eval("score = fwd_ret * 100")
+df["signal"] = df["score"] > 0
+df["pnl"] = df["signal"] * df["fwd_ret"]
+#### C1_copysign_fwd_into_size
+import numpy as np, pandas as pd
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+df["fwd_ret"] = df["close"].pct_change().shift(-1)
+df["pnl"] = np.copysign(df["fwd_ret"], df["fwd_ret"].rolling(3).mean())
+#### C2_copysign_inline_fwd_in_signal
+import numpy as np, pandas as pd
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+nxt = df["close"].shift(-1)
+df["position"] = np.copysign(1.0, nxt - df["close"])
+df["pnl"] = df["position"] * df["close"].pct_change().shift(-1)
+#### A1_open_entry_signal_from_high
+import pandas as pd
+df = pd.read_csv("aapl.csv", index_col=0, parse_dates=True)
+brk = df["high"] > df["high"].rolling(20).max().shift(1)
+entry_px = df["open"].where(brk)
+exit_px = df["close"].shift(-5).where(brk)
+r = (exit_px / entry_px - 1).dropna()
+#### A2_open_entry_via_loc_mask
+import pandas as pd
+df = pd.read_csv("aapl.csv", index_col=0, parse_dates=True)
+up = df["close"] > df["close"].shift(1)
+fills = df.loc[up, "open"]
+exits = df["close"].shift(-1).loc[up]
+print((exits / fills - 1).mean())
+#### A3_open_entry_in_loop_row
+import pandas as pd
+df = pd.read_csv("aapl.csv", parse_dates=["date"])
+trades = []
+for _, row in df.iterrows():
+    if row["close"] > row["open"] * 1.01:
+        trades.append(row["close"] / row["open"] - 1)
+print(sum(trades))

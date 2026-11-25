@@ -1,0 +1,33 @@
+#### Q01_concat_forgot_drop
+import pandas as pd
+from sklearn.ensemble import GradientBoostingRegressor
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+feats = pd.DataFrame({"mom": df["close"].pct_change(20), "vol": df["close"].pct_change().rolling(20).std()})
+target = df["close"].shift(-5) / df["close"] - 1
+data = pd.concat([feats, target.rename("target")], axis=1).dropna()
+split = int(len(data) * 0.7)
+model = GradientBoostingRegressor().fit(data.iloc[:split], data["target"].iloc[:split])
+print(model.score(data.iloc[split:], data["target"].iloc[split:]))
+#### Q02_concat_then_X_select_includes_fwd
+import pandas as pd
+from sklearn.ensemble import GradientBoostingRegressor
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+mom = df["close"].pct_change(20)
+fut = df["close"].shift(-5) / df["close"] - 1
+data = pd.concat([mom.rename("mom"), fut.rename("fut")], axis=1).dropna()
+X = data[["mom", "fut"]]
+model = GradientBoostingRegressor().fit(X.iloc[:1000], data["fut"].iloc[:1000])
+#### Q03_concat_signal_from_container
+import pandas as pd, numpy as np
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+fut = df["close"].shift(-1) / df["close"] - 1
+frame = pd.concat([df["close"], fut], axis=1, keys=["close", "fut"])
+frame["position"] = np.where(frame["fut"] > 0, 1, -1)
+#### Q04_dataframe_np_column_stack
+import numpy as np, pandas as pd
+from sklearn.linear_model import LogisticRegression
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+fut = (df["close"].shift(-1) > df["close"]).astype(int)
+mom = df["close"].pct_change(10)
+M = pd.DataFrame({"mom": mom, "fut": fut}).dropna().to_numpy()
+clf = LogisticRegression().fit(M[:1000], M[:1000, 1])

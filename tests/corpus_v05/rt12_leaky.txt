@@ -1,0 +1,255 @@
+#### R01_signal_idx_from_future_indirect
+import numpy as np, pandas as pd
+def simulate(bars, signal_idx, hold=5):
+    o, lo, c = bars["open"].to_numpy(), bars["low"].to_numpy(), bars["close"].to_numpy()
+    trades = []
+    for i in signal_idx:
+        if i + 1 + hold >= len(c):
+            break
+        limit = c[i] * 0.995
+        if lo[i + 1] <= limit:
+            fill = min(limit, o[i + 1])
+            trades.append(c[i + 1 + hold] / fill - 1)
+    return trades
+bars = pd.read_parquet("spy.parquet")
+up_next = bars["close"].shift(-5) > bars["close"]
+mask = up_next.to_numpy()
+idx = np.flatnonzero(mask)
+print(np.mean(simulate(bars, idx)))
+#### R02_signal_idx_from_future_where
+import numpy as np, pandas as pd
+bars = pd.read_parquet("spy.parquet")
+o, lo, c = bars["open"].to_numpy(), bars["low"].to_numpy(), bars["close"].to_numpy()
+fwd = np.r_[c[5:] / c[:-5] - 1, np.full(5, np.nan)]
+idx = np.where(fwd > 0.01)[0]
+trades = []
+for i in idx:
+    if i + 6 >= len(c):
+        break
+    limit = c[i] * 0.995
+    if lo[i + 1] <= limit:
+        trades.append(c[i + 6] / min(limit, o[i + 1]) - 1)
+print(np.mean(trades))
+#### R03_cooldown_from_trade_return
+import numpy as np, pandas as pd
+d = pd.read_csv("spy.csv")
+o, lo, c = (d[k].to_numpy() for k in ("open", "low", "close"))
+sma = d["close"].rolling(20).mean().to_numpy()
+HOLD = 5
+trades, last_ret = [], 0.0
+for i in range(20, len(c) - HOLD - 1):
+    if c[i] < sma[i] and last_ret >= 0:
+        limit = c[i] * 0.99
+        if lo[i + 1] <= limit:
+            fill = min(limit, o[i + 1])
+            last_ret = c[i + 1 + HOLD] / fill - 1
+            trades.append(last_ret)
+print(np.mean(trades))
+#### R04_reentry_on_exit_px
+import numpy as np, pandas as pd
+d = pd.read_csv("spy.csv")
+o, lo, c = (d[k].to_numpy() for k in ("open", "low", "close"))
+HOLD = 3
+trades = []
+for i in range(20, len(c) - HOLD - 1):
+    limit = c[i] * 0.99
+    if c[i] < c[i - 5] and lo[i + 1] <= limit:
+        fill = min(limit, o[i + 1])
+        exit_px = c[i + 1 + HOLD]
+        if exit_px > fill:
+            trades.append(exit_px / fill - 1)
+print(np.mean(trades))
+#### R05_nxt_decides_new_entry
+import numpy as np, pandas as pd
+bars = pd.read_csv("spy_hourly.csv", index_col=0, parse_dates=True)
+close = bars["close"]
+res = []
+in_pos, entry = False, None
+for t in range(20, len(bars) - 1):
+    nxt = bars.iloc[t + 1]
+    if not in_pos and nxt["close"] > nxt["open"]:
+        entry = nxt["open"]
+        in_pos = True
+    elif in_pos and nxt["high"] >= entry * 1.01:
+        res.append(0.01)
+        in_pos = False
+print(np.mean(res))
+#### R06_nxt_low_new_entry_decision
+import numpy as np, pandas as pd
+bars = pd.read_csv("spy_hourly.csv", index_col=0, parse_dates=True)
+close = bars["close"]
+res = []
+for t in range(20, len(bars) - 2):
+    nxt = bars.iloc[t + 1]
+    if close.iloc[t] < close.iloc[t - 10:t].mean() and nxt["low"] > close.iloc[t] * 0.995:
+        res.append(bars["close"].iloc[t + 2] / nxt["open"] - 1)
+print(np.mean(res))
+#### R07_stop_from_next_low
+import numpy as np, pandas as pd
+d = pd.read_csv("spy.csv")
+o, h, lo, c = (d[k].to_numpy() for k in ("open", "high", "low", "close"))
+sma = d["close"].rolling(20).mean().to_numpy()
+pnl = []
+for i in range(20, len(c) - 2):
+    if c[i] > sma[i]:
+        entry_px = o[i + 1]
+        stop = lo[i + 1] * 0.999
+        if lo[i + 2] <= stop:
+            pnl.append(stop / entry_px - 1)
+        else:
+            pnl.append(c[i + 2] / entry_px - 1)
+print(sum(pnl))
+#### R08_and_term_hidden_bar_data
+import numpy as np, pandas as pd
+d = pd.read_csv("spy.csv")
+o, lo, c = (d[k].to_numpy() for k in ("open", "low", "close"))
+out = []
+for i in range(20, len(c) - 6):
+    limit = c[i] * 0.985
+    nxt_ok = c[i + 1] > o[i + 1]
+    if nxt_ok and lo[i + 1] <= limit:
+        out.append(c[i + 6] / min(limit, o[i + 1]) - 1)
+print(np.mean(out))
+#### R09_and_term_helper_reads_future
+import numpy as np, pandas as pd
+d = pd.read_csv("spy.csv")
+o, lo, c = (d[k].to_numpy() for k in ("open", "low", "close"))
+def good(j):
+    return c[j + 1] > c[j]
+out = []
+for i in range(20, len(c) - 6):
+    limit = c[i] * 0.985
+    if good(i) and lo[i + 1] <= limit:
+        out.append(c[i + 6] / min(limit, o[i + 1]) - 1)
+print(np.mean(out))
+#### R10_limit_from_next_open
+import numpy as np, pandas as pd
+d = pd.read_csv("spy.csv")
+o, lo, c = (d[k].to_numpy() for k in ("open", "low", "close"))
+out = []
+for i in range(20, len(c) - 6):
+    if c[i] < c[i - 1]:
+        limit = o[i + 1] * 0.99
+        if lo[i + 1] <= limit:
+            out.append(c[i + 6] / limit - 1)
+print(np.mean(out))
+#### R11_fill_at_low_not_limit
+import numpy as np, pandas as pd
+d = pd.read_csv("spy.csv")
+o, lo, c = (d[k].to_numpy() for k in ("open", "low", "close"))
+out = []
+for i in range(20, len(c) - 6):
+    if c[i] < c[i - 1]:
+        limit = c[i] * 0.99
+        if lo[i + 1] <= limit:
+            out.append(c[i + 6] / lo[i + 1] - 1)
+print(np.mean(out))
+#### R12_break_bound_not_bound
+import numpy as np, pandas as pd
+d = pd.read_csv("spy.csv")
+c = d["close"].to_numpy()
+pos = np.zeros(len(c))
+for i in range(len(c)):
+    if i + 1 >= len(c) or c[i + 1] > c[i]:
+        pos[i] = 1
+pnl = pos[:-1] * np.diff(c) / c[:-1]
+#### S01_numpy_label_mean_fed_back
+import numpy as np
+p = np.load("closes.npy")
+H = 10
+labels = np.full(len(p), np.nan)
+for i in range(len(p) - H):
+    labels[i] = 1.0 if p[i + H] > p[i] else -1.0
+bias = np.nanmean(labels)
+pos = np.sign(bias) * np.ones(len(p))
+ret = np.diff(p) / p[:-1]
+pnl = pos[:-1] * ret
+#### S02_numpy_label_save_load_signal
+import numpy as np
+p = np.load("closes.npy")
+H = 10
+labels = np.full(len(p), np.nan)
+for i in range(len(p) - H):
+    labels[i] = 1.0 if p[i + H] > p[i] else -1.0
+np.save("labels.npy", labels)
+sig = np.load("labels.npy")
+pnl = np.nan_to_num(sig[:-1]) * np.diff(p) / p[:-1]
+#### S03_numpy_label_unique_then_where
+import numpy as np
+p = np.load("closes.npy")
+H = 5
+labels = np.zeros(len(p))
+for i in range(len(p) - H):
+    labels[i] = 1.0 if p[i + H] > p[i] else 0.0
+vals, counts = np.unique(labels, return_counts=True)
+pos = np.where(labels == vals[np.argmax(counts)], 1.0, 0.0)
+pnl = pos[:-1] * np.diff(p) / p[:-1]
+#### T01_lambda_negative_shift
+import pandas as pd
+panel = pd.read_parquet("crypto.parquet").sort_values(["symbol", "date"])
+panel["ret"] = panel.groupby("symbol")["close"].pct_change()
+panel["mom"] = panel.groupby("symbol")["close"].transform(lambda s: s.pct_change(7).shift(-1))
+panel["w"] = (panel.groupby("date")["mom"].rank(pct=True) > 0.8).astype(float)
+pnl = (panel["w"] * panel["ret"]).groupby(panel["date"]).mean()
+#### T02_lambda_partial_lag
+import pandas as pd
+panel = pd.read_parquet("crypto.parquet").sort_values(["symbol", "date"])
+panel["ret"] = panel.groupby("symbol")["close"].pct_change()
+panel["fwd5"] = panel.groupby("symbol")["close"].transform(lambda s: s.shift(-5) / s - 1)
+panel["mom"] = panel.groupby("symbol")["fwd5"].transform(lambda s: s.shift(1))
+panel["w"] = (panel.groupby("date")["mom"].rank(pct=True) > 0.8).astype(float)
+pnl = (panel["w"] * panel["ret"]).groupby(panel["date"]).mean()
+#### T03_helper_shifts_other_series
+import pandas as pd
+panel = pd.read_parquet("crypto.parquet").sort_values(["symbol", "date"])
+LAGGED = panel.groupby("symbol")["volume"].shift(1)
+def mom(s):
+    _ = LAGGED
+    return s.pct_change(7)
+panel["ret"] = panel.groupby("symbol")["close"].pct_change()
+panel["mom"] = panel.groupby("symbol")["close"].transform(mom)
+panel["position"] = (panel["mom"] > 0).astype(float)
+pnl = (panel["position"] * panel["ret"]).groupby(panel["date"]).mean()
+#### T04_lambda_lag_then_outside_lead
+import pandas as pd
+panel = pd.read_parquet("crypto.parquet").sort_values(["symbol", "date"])
+panel["ret"] = panel.groupby("symbol")["close"].pct_change()
+panel["mom"] = panel.groupby("symbol")["close"].transform(lambda s: s.pct_change(7).shift(1)).shift(-2)
+panel["position"] = (panel["mom"] > 0).astype(float)
+pnl = (panel["position"] * panel["ret"]).groupby(panel["date"]).mean()
+#### T05_lambda_shift_on_wrong_thing
+import pandas as pd
+panel = pd.read_parquet("crypto.parquet").sort_values(["symbol", "date"])
+panel["ret"] = panel.groupby("symbol")["close"].pct_change()
+panel["sig"] = panel.groupby("symbol")["close"].transform(lambda s: s.shift(1).pct_change(7) + s.pct_change())
+panel["position"] = (panel["sig"] > 0).astype(float)
+pnl = (panel["position"] * panel["ret"]).groupby(panel["date"]).mean()
+#### T06_lambda_shift_then_ret_same_bar
+import pandas as pd
+panel = pd.read_parquet("crypto.parquet").sort_values(["symbol", "date"])
+panel["ret"] = panel.groupby("symbol")["close"].pct_change()
+panel["sig"] = panel.groupby("symbol")["close"].transform(lambda s: (s > s.rolling(20).mean()).astype(float))
+pnl = (panel["sig"] * panel["ret"]).groupby(panel["date"]).mean()
+#### T07_pipe_helper_lead
+import pandas as pd
+def nxt(df):
+    return df.groupby("symbol")["close"].shift(-1) / df["close"] - 1
+panel = pd.read_parquet("crypto.parquet").sort_values(["symbol", "date"])
+panel["ret"] = panel.groupby("symbol")["close"].pct_change()
+panel["sig"] = panel.pipe(nxt)
+panel["position"] = (panel["sig"] > 0).astype(float)
+pnl = (panel["position"] * panel["ret"]).groupby(panel["date"]).mean()
+#### U01_grouping_frame_carries_values
+import pandas as pd
+panel = pd.read_parquet("crypto.parquet").sort_values(["symbol", "date"])
+panel["fwd"] = panel.groupby("symbol")["close"].shift(-1) / panel["close"] - 1
+keys = panel[["symbol", "fwd"]]
+panel["score"] = panel.groupby(keys["symbol"])["fwd"].transform("mean")
+panel["position"] = (panel["score"] > 0).astype(float)
+#### U02_group_by_forward_bucket
+import pandas as pd
+panel = pd.read_parquet("crypto.parquet").sort_values(["symbol", "date"])
+panel["fwd"] = panel.groupby("symbol")["close"].shift(-1) / panel["close"] - 1
+grp = panel[["date"]].assign(up=panel["fwd"] > 0)
+panel["mom"] = panel.groupby([grp["date"], grp["up"]])["close"].transform(lambda s: s.pct_change().shift(1))
+panel["position"] = (panel["mom"] > 0).astype(float)

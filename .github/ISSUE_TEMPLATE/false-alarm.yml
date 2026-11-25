@@ -1,0 +1,39 @@
+name: False alarm on correct code
+description: The Auditor flagged code that is correct.
+labels: ["false-alarm"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks. A short, self-contained snippet is the most useful report. Please remove anything private
+        (paths, data, credentials) before posting: this issue is public.
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Output of `pip show backtest-auditor` (the Version line), or the version your MCP client shows.
+      placeholder: "0.7.0"
+    validations:
+      required: true
+  - type: textarea
+    id: snippet
+    attributes:
+      label: Minimal code
+      description: The smallest Python snippet that still gets the finding.
+      render: python
+    validations:
+      required: true
+  - type: textarea
+    id: finding
+    attributes:
+      label: The finding
+      description: Rule id, severity and line, as reported.
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why the code is correct
+      description: Why the flagged line is correct (for example, it doesn't use future information).
+    validations:
+      required: true

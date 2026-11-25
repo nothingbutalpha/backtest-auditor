@@ -1,0 +1,107 @@
+#### S01_sort_index_axis1_then_iloc
+import pandas as pd
+from sklearn.ensemble import GradientBoostingRegressor
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+fwd = df["close"].shift(-5) / df["close"] - 1
+data = pd.concat([df["close"].pct_change(20), df["close"].pct_change(5), fwd], axis=1, keys=["mom", "rev", "zfwd"]).dropna()
+data = data.sort_index(axis=1)
+X = data.iloc[:, :-1]
+model = GradientBoostingRegressor().fit(X.iloc[:1000], fwd.loc[X.index].iloc[:1000])
+#### S02_reorder_list_then_iloc
+import pandas as pd
+from sklearn.ensemble import GradientBoostingRegressor
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+fwd = df["close"].shift(-5) / df["close"] - 1
+data = pd.concat([df["close"].pct_change(20), df["close"].pct_change(5), fwd], axis=1, keys=["mom", "rev", "zfwd"]).dropna()
+data = data[["zfwd", "mom", "rev"]]
+X = data.iloc[:, :-1]
+model = GradientBoostingRegressor().fit(X.iloc[:1000], fwd.loc[X.index].iloc[:1000])
+#### S03_reverse_cols_then_iloc
+import pandas as pd
+from sklearn.ensemble import GradientBoostingRegressor
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+fwd = df["close"].shift(-5) / df["close"] - 1
+data = pd.concat([df["close"].pct_change(20), df["close"].pct_change(5), fwd], axis=1, keys=["mom", "rev", "zfwd"]).dropna()
+data = data.iloc[:, ::-1]
+X = data.iloc[:, :-1]
+model = GradientBoostingRegressor().fit(X.iloc[:1000], fwd.loc[X.index].iloc[:1000])
+#### S04_shift1_row_op_keeps_lead
+import pandas as pd
+from sklearn.ensemble import GradientBoostingRegressor
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+fwd = df["close"].shift(-5) / df["close"] - 1
+data = pd.concat([df["close"].pct_change(20), df["close"].pct_change(5), fwd], axis=1, keys=["mom", "rev", "zfwd"]).dropna()
+data = data.shift(1).dropna()
+X = data[["mom", "zfwd"]]
+model = GradientBoostingRegressor().fit(X.iloc[:1000], fwd.loc[X.index].iloc[:1000])
+#### S05_copy_col_then_drop
+import pandas as pd
+from sklearn.ensemble import GradientBoostingRegressor
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+fwd = df["close"].shift(-5) / df["close"] - 1
+data = pd.concat([df["close"].pct_change(20), df["close"].pct_change(5), fwd], axis=1, keys=["mom", "rev", "zfwd"]).dropna()
+data["m2"] = data["zfwd"]
+X = data.drop(columns=["zfwd"])
+model = GradientBoostingRegressor().fit(X.iloc[:1000], fwd.loc[X.index].iloc[:1000])
+#### S06_assign_partial_lag
+import pandas as pd
+from sklearn.ensemble import GradientBoostingRegressor
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+fwd = df["close"].shift(-5) / df["close"] - 1
+data = pd.concat([df["close"].pct_change(20), df["close"].pct_change(5), fwd], axis=1, keys=["mom", "rev", "zfwd"]).dropna()
+data = data.assign(zfwd=data["zfwd"].shift(1))
+X = data[["mom", "zfwd"]]
+model = GradientBoostingRegressor().fit(X.iloc[:1000], fwd.loc[X.index].iloc[:1000])
+#### T01_long_mask_select
+import pandas as pd, numpy as np
+df = pd.read_parquet("panel.parquet")
+df["fwd_ret"] = df.groupby("ticker")["close"].pct_change().shift(-1)
+mkt = df.groupby("date")["fwd_ret"].mean()
+bench = df.groupby("date")["close"].mean().pct_change().shift(-1)
+long = mkt > 0
+pnl = bench[long].sum() - bench[~long].sum()
+#### T02_short_rank_loc
+import pandas as pd, numpy as np
+df = pd.read_parquet("panel.parquet")
+df["fwd_ret"] = df.groupby("ticker")["close"].pct_change().shift(-1)
+mkt = df.groupby("date")["fwd_ret"].mean()
+bench = df.groupby("date")["close"].mean().pct_change().shift(-1)
+short = mkt.rank(pct=True) < 0.2
+strat = bench.copy()
+strat.loc[short] = -bench.loc[short]
+#### T03_trade_where_flip
+import pandas as pd, numpy as np
+df = pd.read_parquet("panel.parquet")
+df["fwd_ret"] = df.groupby("ticker")["close"].pct_change().shift(-1)
+mkt = df.groupby("date")["fwd_ret"].mean()
+bench = df.groupby("date")["close"].mean().pct_change().shift(-1)
+trade = np.where(mkt > 0, 1, -1)
+pnl = pd.Series(trade, index=mkt.index).mul(bench)
+#### U01_clean_shift5_container
+import pandas as pd
+from sklearn.ensemble import GradientBoostingRegressor
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+fwd = df["close"].shift(-5) / df["close"] - 1
+data = pd.concat([df["close"].pct_change(20), df["close"].pct_change(5), fwd], axis=1, keys=["mom", "rev", "zfwd"]).dropna()
+lagged = data.shift(5).dropna()
+X = lagged[["mom", "zfwd"]]
+model = GradientBoostingRegressor().fit(X.iloc[:1000], fwd.loc[X.index].iloc[:1000])
+#### U02_clean_long_leg_ic
+import pandas as pd, numpy as np
+df = pd.read_parquet("panel.parquet")
+df["fwd_ret"] = df.groupby("ticker")["close"].pct_change().shift(-1)
+mkt = df.groupby("date")["fwd_ret"].mean()
+bench = df.groupby("date")["close"].mean().pct_change().shift(-1)
+df["q"] = df.groupby("date")["mom"].transform(lambda s: pd.qcut(s, 5, labels=False))
+long = df[df["q"] == 4].groupby("date")["fwd_ret"].mean()
+short = df[df["q"] == 0].groupby("date")["fwd_ret"].mean()
+trade = long - short
+print(trade.mean(), np.sign(trade).mean())
+#### U03_clean_known_order_iloc
+import pandas as pd
+from sklearn.ensemble import GradientBoostingRegressor
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+fwd = df["close"].shift(-5) / df["close"] - 1
+data = pd.concat([df["close"].pct_change(20), df["close"].pct_change(5), fwd], axis=1, keys=["mom", "rev", "zfwd"]).dropna()
+X = data.iloc[:, :-1]
+model = GradientBoostingRegressor().fit(X.iloc[:1000], fwd.loc[X.index].iloc[:1000])

@@ -1,0 +1,16 @@
+#### K01_ic_frame
+import pandas as pd
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+mom = df["close"].pct_change(20)
+fwd = df["close"].shift(-5) / df["close"] - 1
+tbl = pd.DataFrame({"mom": mom, "fwd": fwd}).dropna()
+print(tbl["mom"].corr(tbl["fwd"]))
+#### K02_concat_then_drop
+import pandas as pd
+from sklearn.ensemble import GradientBoostingRegressor
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+feats = pd.DataFrame({"mom": df["close"].pct_change(20)})
+target = df["close"].shift(-5) / df["close"] - 1
+data = pd.concat([feats, target.rename("target")], axis=1).dropna()
+X = data.drop(columns=["target"])
+model = GradientBoostingRegressor().fit(X.iloc[:1000], data["target"].iloc[:1000])

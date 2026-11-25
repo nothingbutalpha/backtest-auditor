@@ -1,0 +1,178 @@
+#### L01_lead5_lag1_named_neutral
+import pandas as pd
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+df["r5"] = df["close"].shift(-5) / df["close"] - 1
+df["m"] = df["r5"].shift(1)
+df["signal"] = (df["m"] > 0).astype(int)
+df["strat"] = df["signal"].shift(1) * df["close"].pct_change()
+#### L02_lead5_chain_lag1
+import pandas as pd
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+df["trend"] = df["close"].shift(-5).shift(1).rolling(3).mean()
+df["position"] = (df["trend"] > df["close"]).astype(int)
+df["strat"] = df["position"].shift(1) * df["close"].pct_change()
+#### L03_lead_variable_minus_lag
+import pandas as pd
+H = 5
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+df["fwd_ret"] = df["close"].pct_change(H).shift(-H)
+df["mom"] = df["fwd_ret"].shift(1)
+X = df[["mom"]].dropna()
+y = df.loc[X.index, "fwd_ret"]
+from sklearn.linear_model import LinearRegression
+m = LinearRegression().fit(X[:500], y[:500])
+#### L04_market_timing_from_groupby_mean
+import pandas as pd, numpy as np
+df = pd.read_parquet("panel.parquet")
+df["fwd_ret"] = df.groupby("ticker")["close"].pct_change().shift(-1)
+mkt = df.groupby("date")["fwd_ret"].mean()
+position = np.sign(mkt)
+pnl = position.shift(1) * df.groupby("date")["close"].mean().pct_change()
+#### L05_rolling_sharpe_of_forward_pnl_as_weight
+import pandas as pd, numpy as np
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+df["fwd_ret"] = df["close"].pct_change().shift(-1)
+df["signal"] = np.sign(df["close"] - df["close"].rolling(50).mean())
+edge = df["signal"] * df["fwd_ret"]
+weight = edge.rolling(60).mean() / edge.rolling(60).std()
+df["strat"] = weight * df["signal"] * df["fwd_ret"]
+#### L06_entry_px_gap_signal_no_compare
+import pandas as pd, numpy as np
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+entry_px = df["open"].shift(-1)
+gap = entry_px / df["close"] - 1
+position = np.sign(gap)
+pnl = position * (df["close"].shift(-1) / entry_px - 1)
+#### L07_entry_px_feature_model
+import pandas as pd
+from sklearn.linear_model import LogisticRegression
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+df["entry_px"] = df["open"].shift(-1)
+df["gap"] = df["entry_px"] / df["close"] - 1
+df["target"] = (df["close"].shift(-1) > df["entry_px"]).astype(int)
+X = df[["gap"]].iloc[:-1]
+y = df["target"].iloc[:-1]
+model = LogisticRegression().fit(X[:1000], y[:1000])
+#### L08_target_encoding_loc
+import pandas as pd
+df = pd.read_parquet("panel.parquet")
+df["fwd_ret"] = df.groupby("ticker")["close"].pct_change().shift(-1)
+avg = df.groupby("sector")["fwd_ret"].mean()
+score = avg.loc[df["sector"]].to_numpy()
+weights = pd.Series(score, index=df.index).rank(pct=True)
+df["pnl"] = weights * df["fwd_ret"]
+#### L09_drop_only_one_of_two_forward
+import pandas as pd
+from sklearn.ensemble import RandomForestRegressor
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+df["ret1"] = df["close"].pct_change()
+df["fwd_ret"] = df["close"].shift(-5) / df["close"] - 1
+df["fwd_ret_l1"] = df["fwd_ret"].shift(1)
+df = df.dropna()
+X = df.drop(columns=["fwd_ret"])
+y = df["fwd_ret"]
+model = RandomForestRegressor().fit(X[:2000], y[:2000])
+#### L10_fit_on_iloc_minus1
+import pandas as pd
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import Ridge
+df = pd.read_csv("feat.csv", index_col=0, parse_dates=True)
+X = df[["a", "b", "c"]]
+y = df["close"].pct_change().shift(-1)
+scaler = StandardScaler()
+Xs = scaler.fit_transform(X.iloc[:-1])
+X_train, X_test = Xs[:2000], Xs[2000:]
+y_train, y_test = y.iloc[:2000], y.iloc[2000:-1]
+model = Ridge().fit(X_train, y_train)
+print(model.score(X_test, y_test))
+#### L11_fit_on_loc_start
+import pandas as pd
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import Ridge
+df = pd.read_csv("feat.csv", index_col=0, parse_dates=True)
+X = df[["a", "b", "c"]].loc["2005":]
+y = df["close"].pct_change().shift(-1).loc["2005":]
+scaler = StandardScaler().fit(X.loc["2005":])
+Xs = scaler.transform(X)
+X_train, X_test = Xs[:2000], Xs[2000:]
+model = Ridge().fit(X_train, y[:2000])
+print(model.score(X_test, y[2000:]))
+#### L12_fit_on_test_slice
+import pandas as pd
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import Ridge
+df = pd.read_csv("feat.csv", index_col=0, parse_dates=True)
+X = df[["a", "b", "c"]]
+y = df["close"].pct_change().shift(-1)
+model = Ridge().fit(X.iloc[:-1], y.iloc[:-1])
+pred = model.predict(X.iloc[:-1])
+print(((pred > 0) == (y.iloc[:-1] > 0)).mean())
+#### L13_overlap_train_test
+import pandas as pd
+from sklearn.ensemble import GradientBoostingClassifier
+df = pd.read_csv("feat.csv", index_col=0, parse_dates=True)
+X = df[["a", "b", "c"]]
+y = (df["close"].shift(-1) > df["close"]).astype(int)
+clf = GradientBoostingClassifier().fit(X.iloc[:3000], y.iloc[:3000])
+acc = clf.score(X.iloc[2500:], y.iloc[2500:])
+#### L14_lgb_dataset_feature_is_fwd
+import pandas as pd, lightgbm as lgb
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+df["fut"] = df["close"].shift(-1) / df["close"] - 1
+df["mom"] = df["close"].pct_change(20)
+train = df.iloc[:2000]
+dtrain = lgb.Dataset(train[["mom", "fut"]], label=(train["fut"] > 0).astype(int))
+bst = lgb.train({"objective": "binary"}, dtrain)
+#### L15_lgb_dataset_label_kw_data
+import pandas as pd, xgboost as xgb
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+df["nxt"] = df["close"].shift(-1)
+feats = df[["close", "nxt"]]
+dtrain = xgb.DMatrix(feats.iloc[:2000], label=df["close"].pct_change().shift(-1).iloc[:2000])
+bst = xgb.train({}, dtrain)
+#### L16_np_roll_neg_chain
+import numpy as np, pandas as pd
+c = pd.read_csv("px.csv")["close"].to_numpy()
+nxt = np.roll(c, -3)
+sig = np.where(np.roll(nxt, 1) > c, 1, -1)
+ret = np.diff(c, prepend=c[0]) / c
+pnl = np.roll(sig, 1) * ret
+#### L17_masked_selection_feeds_signal
+import pandas as pd, numpy as np
+df = pd.read_parquet("panel.parquet")
+df["fwd_ret"] = df.groupby("ticker")["close"].pct_change().shift(-1)
+winners = df.loc[df["fwd_ret"] > 0, "ticker"]
+df["signal"] = df["ticker"].isin(winners).astype(int)
+df["pnl"] = df["signal"] * df["fwd_ret"]
+#### L18_ic_used_to_choose_feature
+import pandas as pd
+df = pd.read_parquet("panel.parquet")
+df["fwd_ret"] = df.groupby("ticker")["close"].pct_change().shift(-1)
+feats = ["mom", "rev", "val"]
+ic = {f: df[f].corr(df["fwd_ret"]) for f in feats}
+best = max(ic, key=ic.get)
+df["signal"] = df.groupby("date")[best].rank(pct=True)
+df["pnl"] = (df["signal"] > 0.8) * df["fwd_ret"]
+#### L19_position_times_fwd_then_equity_filter
+import pandas as pd, numpy as np
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+df["fwd_ret"] = df["close"].pct_change().shift(-1)
+df["position"] = np.sign(df["close"].pct_change(20))
+df["daily"] = df["position"] * df["fwd_ret"]
+df["eq_trend"] = df["daily"].rolling(20).sum()
+df["position2"] = df["position"] * np.sign(df["eq_trend"])
+df["strat"] = df["position2"] * df["fwd_ret"]
+#### L20_groupby_transform_target_encoding
+import pandas as pd
+df = pd.read_parquet("panel.parquet")
+df["fwd_ret"] = df.groupby("ticker")["close"].pct_change().shift(-1)
+df["te"] = df.groupby("sector")["fwd_ret"].transform("mean")
+df["signal"] = df.groupby("date")["te"].rank(pct=True)
+#### L21_drop_with_neutral_name_kept
+import pandas as pd
+from sklearn.linear_model import Ridge
+df = pd.read_csv("px.csv", index_col=0, parse_dates=True)
+df["y"] = df["close"].pct_change().shift(-1)
+df["z"] = df["close"].shift(-1) / df["close"]
+X = df.drop(columns=["y"]).dropna()
+model = Ridge().fit(X.iloc[:2000], df["y"].loc[X.index][:2000])
